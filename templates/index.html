@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>On-Air — Bediening</title>
+  <link rel="stylesheet" href="/static/onair.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">On-Air</span>
+    <span class="user">{{ naam }} · <a href="/logout">uitloggen</a></span>
+  </header>
+
+  <main id="lampgrid" class="lampgrid">
+    {% for lamp in lamps %}
+    <button class="tile {{ 'on' if lamp.state else 'off' }} {{ '' if lamp.online else 'offline' }}"
+            data-id="{{ lamp.id }}" data-state="{{ '1' if lamp.state else '0' }}">
+      <span class="tile-naam">{{ lamp.naam }}</span>
+      {% if lamp.ruimte %}<span class="tile-ruimte">{{ lamp.ruimte }}</span>{% endif %}
+      <span class="tile-status">{{ 'ON AIR' if lamp.state else 'uit' }}</span>
+      <span class="dot" title="verbinding"></span>
+    </button>
+    {% endfor %}
+  </main>
+
+  <p id="empty" class="empty" {% if lamps %}hidden{% endif %}>
+    Nog geen lampen aangemeld. Zodra een ESP32 verbinding maakt, verschijnt hij hier.
+  </p>
+
+  <script src="/static/onair.js"></script>
+</body>
+</html>
