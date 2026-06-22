@@ -101,3 +101,75 @@ body {
 .tile.offline .dot { background: var(--muted); }
 
 .empty { color: var(--muted); text-align: center; padding: 2rem; }
+
+/* -- Beheerpagina ---------------------------------------------------- */
+.beheer { padding: 1.2rem; display: flex; flex-direction: column; gap: 1.2rem; max-width: 1000px; margin: 0 auto; }
+.kaart { background: var(--panel); border: 1px solid #2a2e37; border-radius: 14px; padding: 1.2rem; }
+.kaart h2 { margin: 0 0 .3rem; }
+.hint { color: var(--muted); font-size: .85rem; margin: .2rem 0 1rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; }
+
+.btn {
+  cursor: pointer; padding: .5rem .8rem; border: 1px solid #333842; border-radius: 8px;
+  background: #262b33; color: var(--text); font-size: .85rem; text-decoration: none; display: inline-block;
+}
+.btn:hover { background: #2f3540; }
+.btn-primair { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.device-row { display: grid; grid-template-columns: minmax(90px, 140px) 1fr 1fr 1fr auto; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+.device-row input,
+.nieuw-rc input,
+.rc-card input,
+.rc-card select {
+  padding: .5rem; border-radius: 8px; border: 1px solid #333842; background: #14161a; color: var(--text); font-size: .9rem;
+}
+.nieuw-rc { display: flex; gap: .5rem; margin-bottom: 1rem; }
+.nieuw-rc input { flex: 1; }
+
+.rc-card { border: 1px solid #2a2e37; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; background: #181b21; }
+.rc-head { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.rc-head .rc-naam { font-weight: 700; font-size: 1rem; flex: 1; min-width: 160px; }
+.rc-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+.rc-link { margin: .5rem 0; word-break: break-all; }
+.rc-kol { display: flex; align-items: center; gap: .5rem; color: var(--muted); font-size: .85rem; margin: .5rem 0; }
+.rc-kol input { width: 70px; }
+.rc-card-acties { display: flex; gap: .5rem; margin-top: .5rem; }
+
+.knop-row { display: grid; grid-template-columns: 1fr 48px 110px 2fr auto; gap: .5rem; align-items: center; margin-bottom: .5rem; padding: .5rem; background: #14161a; border-radius: 8px; }
+.knop-row .k-kleur { padding: 0; height: 36px; }
+.k-targets { display: flex; flex-wrap: wrap; gap: .3rem .8rem; }
+.k-targets .chk { font-size: .8rem; color: var(--muted); display: flex; align-items: center; gap: .25rem; }
+.btn-kdel { background: #3a2326; border-color: #5a2c30; }
+
+@media (max-width: 640px) {
+  .device-row, .knop-row { grid-template-columns: 1fr; }
+}
+
+/* -- Afstandsbediening (kiosk, teal-thema) --------------------------- */
+.rc-body { background: #0c2227; }
+.rc-topbar { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem; }
+.rc-titel { font-size: 1.4rem; font-weight: 700; }
+.rc-pill {
+  font-size: .8rem; letter-spacing: .08em; padding: .35rem .7rem; border-radius: 999px;
+  border: 1px solid #1f4a50; background: #10353b; color: var(--muted); white-space: nowrap;
+}
+.rc-pill.online { color: #7ee0c0; }
+.rc-pill.offline { color: #c98b8b; }
+.rc-grid { display: grid; grid-template-columns: repeat(var(--kolommen, 2), 1fr); gap: 1rem; padding: 1.2rem; max-width: 900px; margin: 0 auto; }
+.rc-knop {
+  position: relative; border-radius: 18px; cursor: pointer; color: var(--text);
+  background: #10353b; border: 1px solid #1f4a50; min-height: 120px; padding: 1rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4rem;
+  transition: background .15s, box-shadow .15s, transform .05s, opacity .15s;
+}
+.rc-knop:active { transform: scale(.97); }
+.rc-knop.on {
+  background: var(--kleur, #e11d2a);
+  border-color: var(--kleur, #e11d2a);
+  box-shadow: 0 0 0 2px var(--kleur, #e11d2a), 0 0 30px color-mix(in srgb, var(--kleur, #e11d2a) 55%, transparent);
+}
+.rc-knop-label { font-size: 1.25rem; font-weight: 700; text-align: center; }
+.rc-knop-status { font-size: .8rem; letter-spacing: .1em; opacity: .85; }
+.rc-knop.offline { opacity: .5; }
+.rc-knop.bezig { opacity: .7; }
+.rc-leeg { color: var(--muted); text-align: center; padding: 2rem; }

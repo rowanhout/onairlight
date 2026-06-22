@@ -23,6 +23,7 @@ load_dotenv()
 
 import auth
 import devices
+import remotes
 from hub import manager
 
 API_KEY = os.getenv("ONAIR_API_KEY", "")
@@ -89,6 +90,14 @@ def require_api(request: Request, x_api_key: str | None = Header(default=None)) 
     raise _Unauthorized()
 
 
+def require_admin(request: Request) -> str:
+    """Beheer-API: vereist een ingelogde admin-sessie (geen API-key)."""
+    user = auth.get_session_user(request)
+    if not user or not auth.is_admin(user):
+        raise _Unauthorized()
+    return user
+
+
 class _Unauthorized(Exception):
     pass
 
@@ -133,7 +142,24 @@ async def index(request: Request, user: str = Depends(require_login)):
             "request": request,
             "user": user,
             "naam": auth.get_display_naam(user),
+            "is_admin": auth.is_admin(user),
             "lamps": devices.all_lamps(),
+        },
+    )
+
+
+@app.get("/beheer", response_class=HTMLResponse)
+async def beheer(request: Request, user: str = Depends(require_login)):
+    """Beheerpagina (admin-only): devices hernoemen + afstandsbedieningen."""
+    if not auth.is_admin(user):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse(
+        "beheer.html",
+        {
+            "request": request,
+            "naam": auth.get_display_naam(user),
+            "lamps": [_public(l) for l in devices.all_lamps()],
+            "remotes": [_remote_public(r) for r in remotes.all_remotes()],
         },
     )
 
@@ -211,6 +237,154 @@ async def api_group_off(groep: str, _: str = Depends(require_api)):
     return [await _apply_state(l["id"], False) for l in lampen]
 
 
+@app.post("/api/lamps/{lamp_id}/rename")
+async def api_lamp_rename(lamp_id: str, request: Request, _: str = Depends(require_admin)):
+    """Hernoem een device: naam/ruimte/groep. De id blijft ongemoeid."""
+    data = await request.json()
+    lamp = devices.update_meta(
+        lamp_id,
+        naam=data.get("naam"),
+        ruimte=data.get("ruimte"),
+        groep=data.get("groep"),
+    )
+    if lamp is None:
+        return JSONResponse({"error": "onbekende lamp"}, status_code=404)
+    payload = _public(lamp)
+    await manager.broadcast({"type": "lamp", "lamp": payload})
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# Afstandsbedieningen (beheer + kiosk-pagina)
+# ---------------------------------------------------------------------------
+
+def _remote_public(r: dict) -> dict:
+    return {
+        "slug": r["slug"],
+        "naam": r.get("naam", r["slug"]),
+        "token": r.get("token", ""),
+        "kolommen": r.get("kolommen", 2),
+        "knoppen": r.get("knoppen", []),
+        "url": f"/rc/{r['slug']}?token={r.get('token', '')}",
+    }
+
+
+def _sanitize_buttons(knoppen) -> list:
+    """Maak de van de client ontvangen knoppen veilig en consistent."""
+    out = []
+    if not isinstance(knoppen, list):
+        return out
+    for k in knoppen:
+        if not isinstance(k, dict):
+            continue
+        actie = k.get("actie")
+        if actie not in ("on", "off", "toggle"):
+            actie = "toggle"
+        targets = [str(t) for t in k.get("targets", []) if isinstance(t, str)]
+        out.append({
+            "label": str(k.get("label", "")),
+            "kleur": str(k.get("kleur", "#e11d2a")),
+            "actie": actie,
+            "targets": targets,
+        })
+    return out
+
+
+def _check_remote_token(slug: str, token: str | None) -> dict | None:
+    r = remotes.get(slug)
+    if r is None or not token or token != r.get("token"):
+        return None
+    return r
+
+
+@app.get("/api/remotes")
+async def api_remotes(_: str = Depends(require_admin)):
+    return [_remote_public(r) for r in remotes.all_remotes()]
+
+
+@app.post("/api/remotes")
+async def api_remote_create(request: Request, _: str = Depends(require_admin)):
+    data = await request.json()
+    naam = (data.get("naam") or "").strip()
+    if not naam:
+        return JSONResponse({"error": "naam verplicht"}, status_code=400)
+    return _remote_public(remotes.create(naam))
+
+
+@app.get("/api/remotes/{slug}")
+async def api_remote_get(slug: str, _: str = Depends(require_admin)):
+    r = remotes.get(slug)
+    if r is None:
+        return JSONResponse({"error": "onbekende afstandsbediening"}, status_code=404)
+    return _remote_public(r)
+
+
+@app.put("/api/remotes/{slug}")
+async def api_remote_update(slug: str, request: Request, _: str = Depends(require_admin)):
+    data = await request.json()
+    r = remotes.update(
+        slug,
+        naam=(data.get("naam") or "").strip() or None,
+        kolommen=data.get("kolommen"),
+        knoppen=_sanitize_buttons(data.get("knoppen")),
+    )
+    if r is None:
+        return JSONResponse({"error": "onbekende afstandsbediening"}, status_code=404)
+    return _remote_public(r)
+
+
+@app.delete("/api/remotes/{slug}")
+async def api_remote_delete(slug: str, _: str = Depends(require_admin)):
+    if not remotes.delete(slug):
+        return JSONResponse({"error": "onbekende afstandsbediening"}, status_code=404)
+    return {"ok": True}
+
+
+@app.post("/api/remotes/{slug}/token")
+async def api_remote_token(slug: str, _: str = Depends(require_admin)):
+    r = remotes.regenerate_token(slug)
+    if r is None:
+        return JSONResponse({"error": "onbekende afstandsbediening"}, status_code=404)
+    return _remote_public(r)
+
+
+@app.get("/rc/{slug}", response_class=HTMLResponse)
+async def remote_page(slug: str, request: Request, token: str = ""):
+    """Kiosk-/wandtablet-pagina, bereikbaar via geheime token-link (geen login)."""
+    r = _check_remote_token(slug, token)
+    if r is None:
+        return HTMLResponse("Geen toegang — controleer de link/token.", status_code=403)
+    return templates.TemplateResponse(
+        "remote.html",
+        {"request": request, "remote": _remote_public(r), "token": token},
+    )
+
+
+@app.post("/rc/{slug}/action")
+async def remote_action(slug: str, request: Request):
+    """Schakel een knop op een afstandsbediening (token-geverifieerd, geen login)."""
+    data = await request.json()
+    r = _check_remote_token(slug, data.get("token"))
+    if r is None:
+        return JSONResponse({"error": "geen toegang"}, status_code=403)
+    idx = data.get("knop")
+    knoppen = r.get("knoppen", [])
+    if not isinstance(idx, int) or idx < 0 or idx >= len(knoppen):
+        return JSONResponse({"error": "onbekende knop"}, status_code=404)
+    knop = knoppen[idx]
+    targets = knop.get("targets", [])
+    actie = knop.get("actie", "toggle")
+    if actie == "on":
+        desired = True
+    elif actie == "off":
+        desired = False
+    else:  # toggle: uit als alles al aan staat, anders alles aan
+        states = [(devices.get(t) or {}).get("state", False) for t in targets]
+        desired = not (len(states) > 0 and all(states))
+    resultaat = [await _apply_state(t, desired) for t in targets]
+    return {"knop": idx, "state": desired, "lamps": [l for l in resultaat if l]}
+
+
 # ---------------------------------------------------------------------------
 # WebSockets
 # ---------------------------------------------------------------------------
@@ -280,3 +454,28 @@ async def ws_device(ws: WebSocket):
         lamp = devices.set_online(lamp_id, False, _now())
         if lamp is not None:
             await manager.broadcast({"type": "lamp", "lamp": _public(lamp)})
+
+
+@app.websocket("/rc/{slug}/ws")
+async def ws_remote(ws: WebSocket, slug: str):
+    """Live updates voor een afstandsbediening: alleen de toegewezen devices."""
+    token = ws.query_params.get("token")
+    r = remotes.get(slug)
+    if r is None or not token or token != r.get("token"):
+        await ws.close(code=1008)
+        return
+    target_ids = set()
+    for knop in r.get("knoppen", []):
+        target_ids.update(knop.get("targets", []))
+    await manager.connect_client(ws, only_ids=target_ids)
+    try:
+        await ws.send_json({
+            "type": "snapshot",
+            "lamps": [_public(l) for l in devices.all_lamps() if l["id"] in target_ids],
+        })
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await manager.disconnect_client(ws)

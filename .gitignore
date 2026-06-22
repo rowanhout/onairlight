@@ -3,5 +3,10 @@ __pycache__/
 *.pyc
 users.json
 lamps.json
+remotes.json
 .venv/
 venv/
+
+# ESP32-firmware: per-lamp config en build-artefacten
+firmware/onair-esp32/config.h
+.pio/

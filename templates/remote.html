@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ remote.naam }}</title>
+  <link rel="stylesheet" href="/static/onair.css">
+</head>
+<body class="rc-body">
+  <header class="rc-topbar">
+    <span class="rc-titel">{{ remote.naam }}</span>
+    <span id="rc-status" class="rc-pill offline">● VERBINDEN…</span>
+  </header>
+
+  <main id="rc-grid" class="rc-grid" style="--kolommen: {{ remote.kolommen }}"></main>
+  <p id="rc-leeg" class="rc-leeg" hidden>Nog geen knoppen ingesteld voor deze afstandsbediening.</p>
+
+  <script>
+    window.__RC__ = {{ remote | tojson }};
+    window.__TOKEN__ = {{ token | tojson }};
+  </script>
+  <script src="/static/remote.js"></script>
+</body>
+</html>

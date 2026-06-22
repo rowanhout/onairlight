@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>On-Air — Beheer</title>
+  <link rel="stylesheet" href="/static/onair.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">On-Air · Beheer</span>
+    <span class="user"><a href="/">← bediening</a> · {{ naam }} · <a href="/logout">uitloggen</a></span>
+  </header>
+
+  <main class="beheer">
+    <section class="kaart">
+      <h2>Devices hernoemen</h2>
+      <p class="hint">De technische id blijft vast (die staat in de ESP32). Je past alleen naam, ruimte en groep aan.</p>
+      <div id="devices"></div>
+    </section>
+
+    <section class="kaart">
+      <h2>Afstandsbedieningen</h2>
+      <p class="hint">Elke afstandsbediening is een aparte pagina met een deelbare geheime link (zonder login). Wijs er knoppen aan toe; een knop kan één of meerdere devices schakelen.</p>
+      <div class="nieuw-rc">
+        <input id="rc-naam" type="text" placeholder="Naam nieuwe afstandsbediening">
+        <button id="rc-nieuw" class="btn btn-primair">+ Nieuw</button>
+      </div>
+      <div id="remotes"></div>
+    </section>
+  </main>
+
+  <script>
+    window.__DEVICES__ = {{ lamps | tojson }};
+    window.__REMOTES__ = {{ remotes | tojson }};
+  </script>
+  <script src="/static/beheer.js"></script>
+</body>
+</html>

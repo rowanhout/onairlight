@@ -69,6 +69,26 @@ def upsert(lamp_id: str, **velden) -> dict:
         return lamp
 
 
+def update_meta(lamp_id: str, naam: Optional[str] = None, ruimte: Optional[str] = None,
+                groep: Optional[str] = None) -> Optional[dict]:
+    """Werk de weergavevelden (naam/ruimte/groep) van een bestaande lamp bij.
+    De ``id`` blijft ongemoeid (die zit in de ESP32-config). Geeft ``None`` als
+    de lamp niet bestaat; alleen meegegeven (niet-``None``) velden worden gezet."""
+    with _lock:
+        lamps = _load()
+        lamp = lamps.get(lamp_id)
+        if lamp is None:
+            return None
+        if naam is not None:
+            lamp["naam"] = naam
+        if ruimte is not None:
+            lamp["ruimte"] = ruimte
+        if groep is not None:
+            lamp["groep"] = groep
+        _save(lamps)
+        return lamp
+
+
 def set_state(lamp_id: str, state: bool) -> Optional[dict]:
     """Zet de gewenste aan/uit-status. Geeft de lamp terug, of None als onbekend."""
     with _lock:

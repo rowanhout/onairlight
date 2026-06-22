@@ -8,7 +8,7 @@ Twee soorten verbindingen:
 """
 
 import asyncio
-from typing import Dict
+from typing import Dict, Optional
 
 from fastapi import WebSocket
 
@@ -17,28 +17,36 @@ class ConnectionManager:
     def __init__(self) -> None:
         # lamp_id -> device WebSocket (de ESP32)
         self._devices: Dict[str, WebSocket] = {}
-        # alle verbonden browser-clients
-        self._clients: set[WebSocket] = set()
+        # browser-client -> optioneel filter (set van lamp-id's). None = alles.
+        # Afstandsbedieningen krijgen een filter zodat een token-pagina alleen
+        # updates van de toegewezen devices ziet (geen lek van andere lampen).
+        self._clients: Dict[WebSocket, Optional[set]] = {}
         self._lock = asyncio.Lock()
 
     # -- Browser-clients ----------------------------------------------------
 
-    async def connect_client(self, ws: WebSocket) -> None:
+    async def connect_client(self, ws: WebSocket, only_ids: Optional[set] = None) -> None:
         await ws.accept()
         async with self._lock:
-            self._clients.add(ws)
+            self._clients[ws] = only_ids
 
     async def disconnect_client(self, ws: WebSocket) -> None:
         async with self._lock:
-            self._clients.discard(ws)
+            self._clients.pop(ws, None)
 
     async def broadcast(self, message: dict) -> None:
-        """Stuur een bericht naar alle browser-clients. Dode sockets worden
-        opgeruimd."""
+        """Stuur een bericht naar alle browser-clients. Clients met een filter
+        krijgen alleen ``lamp``-updates van hun eigen devices. Dode sockets
+        worden opgeruimd."""
         async with self._lock:
-            clients = list(self._clients)
+            clients = list(self._clients.items())
+        lamp_id = None
+        if message.get("type") == "lamp":
+            lamp_id = message.get("lamp", {}).get("id")
         dood = []
-        for ws in clients:
+        for ws, only_ids in clients:
+            if only_ids is not None and lamp_id is not None and lamp_id not in only_ids:
+                continue
             try:
                 await ws.send_json(message)
             except Exception:
@@ -46,7 +54,7 @@ class ConnectionManager:
         if dood:
             async with self._lock:
                 for ws in dood:
-                    self._clients.discard(ws)
+                    self._clients.pop(ws, None)
 
     # -- Device-sockets (ESP32's) ------------------------------------------
 

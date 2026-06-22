@@ -9,7 +9,7 @@
 <body>
   <header class="topbar">
     <span class="brand">On-Air</span>
-    <span class="user">{{ naam }} · <a href="/logout">uitloggen</a></span>
+    <span class="user">{% if is_admin %}<a href="/beheer">beheer</a> · {% endif %}{{ naam }} · <a href="/logout">uitloggen</a></span>
   </header>
 
   <main id="lampgrid" class="lampgrid">
