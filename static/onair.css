@@ -56,6 +56,9 @@ a:hover { color: var(--kleur-link-hover); }
 }
 .brand { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--kleur-tekst); }
 .brand img { display: block; height: 32px; width: auto; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-text strong { font-family: 'Neue Metana', 'Selasy', 'Open Sans', sans-serif; font-size: 1.05rem; font-weight: 700; }
+.brand-sub { font-family: 'Open Sans', sans-serif; font-size: 0.72rem; font-weight: 400; color: var(--kleur-subtiel); }
 .site-nav { display: flex; align-items: center; gap: 1.2rem; font-size: 0.9rem; }
 .site-nav .nav-user { color: var(--kleur-subtiel); }
 
