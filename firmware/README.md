@@ -26,6 +26,10 @@ en meldt zijn werkelijke status terug.
 
 ## Hardware-bedrading
 
+> Voor de technicus: een volledige stap-voor-stap montage- en
+> bedradingshandleiding staat in [`MONTAGE.md`](MONTAGE.md) (opzet met
+> WT32-ETH01 + PoE-splitter).
+
 De D&R ON Air Light wordt continu gevoed met +12V / -12V. De ESP32 schakelt de
 lamp **laag-zijdig** via een logic-level MOSFET (IRLZ44N) op de twee
 **Control**-klemmen (het massacircuit van de LED-strip).
