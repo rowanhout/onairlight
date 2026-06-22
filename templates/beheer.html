@@ -4,15 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>On-Air — Beheer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/onair.css">
 </head>
 <body>
-  <header class="topbar">
-    <span class="brand">On-Air · Beheer</span>
-    <span class="user"><a href="/">← bediening</a> · {{ naam }} · <a href="/logout">uitloggen</a></span>
+  <header class="site-header">
+    <a href="/" class="brand"><img src="/static/madera-logo.svg" alt="Hout video"></a>
+    <nav class="site-nav">
+      <span class="nav-user">{{ naam }}</span>
+      <a href="/logout">Uitloggen</a>
+    </nav>
   </header>
 
   <main class="beheer">
+    <div class="page-header">
+      <a href="/" class="back-link">&larr; Terug naar bediening</a>
+      <h1>Beheer</h1>
+      <p class="subtitle">Devices hernoemen en afstandsbedieningen samenstellen.</p>
+    </div>
+
     <section class="kaart">
       <h2>Devices hernoemen</h2>
       <p class="hint">De technische id blijft vast (die staat in de ESP32). Je past alleen naam, ruimte en groep aan.</p>
@@ -24,7 +35,7 @@
       <p class="hint">Elke afstandsbediening is een aparte pagina met een deelbare geheime link (zonder login). Wijs er knoppen aan toe; een knop kan één of meerdere devices schakelen.</p>
       <div class="nieuw-rc">
         <input id="rc-naam" type="text" placeholder="Naam nieuwe afstandsbediening">
-        <button id="rc-nieuw" class="btn btn-primair">+ Nieuw</button>
+        <button id="rc-nieuw" class="btn btn-primary">Nieuw</button>
       </div>
       <div id="remotes"></div>
     </section>

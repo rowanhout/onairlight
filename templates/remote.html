@@ -4,12 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ remote.naam }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/onair.css">
 </head>
 <body class="rc-body">
   <header class="rc-topbar">
-    <span class="rc-titel">{{ remote.naam }}</span>
-    <span id="rc-status" class="rc-pill offline">● VERBINDEN…</span>
+    <span class="rc-brand">
+      <img src="/static/madera-logo.svg" alt="Hout video">
+      <span class="rc-titel">{{ remote.naam }}</span>
+    </span>
+    <span id="rc-status" class="status-pill offline">Verbinden…</span>
   </header>
 
   <main id="rc-grid" class="rc-grid" style="--kolommen: {{ remote.kolommen }}"></main>

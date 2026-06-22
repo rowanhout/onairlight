@@ -66,15 +66,15 @@ function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const url = `${proto}://${location.host}/rc/${RC.slug}/ws?token=${encodeURIComponent(TOKEN)}`;
   const ws = new WebSocket(url);
-  ws.onopen = () => { statusEl.textContent = "● ONLINE"; statusEl.className = "rc-pill online"; };
+  ws.onopen = () => { statusEl.textContent = "Online"; statusEl.className = "status-pill online"; };
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (msg.type === "snapshot") msg.lamps.forEach(applyLamp);
     else if (msg.type === "lamp") applyLamp(msg.lamp);
   };
   ws.onclose = () => {
-    statusEl.textContent = "● OFFLINE";
-    statusEl.className = "rc-pill offline";
+    statusEl.textContent = "Offline";
+    statusEl.className = "status-pill offline";
     setTimeout(connect, 1500);
   };
   ws.onerror = () => ws.close();

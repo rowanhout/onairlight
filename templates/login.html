@@ -4,10 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>On-Air — Inloggen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/onair.css">
 </head>
 <body class="login-body">
   <form class="login-card" method="post" action="/login">
+    <div class="login-logo">
+      <img src="/static/madera-logo.svg" alt="Hout video">
+    </div>
     <h1>On-Air</h1>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <label>Gebruikersnaam
@@ -16,7 +21,7 @@
     <label>Wachtwoord
       <input type="password" name="password" autocomplete="current-password" required>
     </label>
-    <button type="submit">Inloggen</button>
+    <button type="submit" class="btn btn-primary">Inloggen</button>
   </form>
 </body>
 </html>

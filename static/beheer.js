@@ -14,7 +14,7 @@ function escapeHtml(s) {
 function flash(btn, ok) {
   const t = btn.dataset.label || btn.textContent;
   btn.dataset.label = t;
-  btn.textContent = ok ? "✓ Opgeslagen" : "✗ Fout";
+  btn.textContent = ok ? "Opgeslagen" : "Mislukt";
   setTimeout(() => { btn.textContent = t; }, 1200);
 }
 
@@ -71,17 +71,17 @@ function renderRemoteCard(rc) {
     `<div class="rc-head">` +
       `<input class="rc-naam" value="${escapeHtml(rc.naam)}">` +
       `<span class="rc-actions">` +
-        `<a class="btn" href="${escapeHtml(rc.url)}" target="_blank" rel="noopener">Openen</a>` +
-        `<button class="btn btn-copy">Kopieer link</button>` +
-        `<button class="btn btn-token">Nieuw token</button>` +
-        `<button class="btn btn-del">Verwijder</button>` +
+        `<a class="btn btn-sm" href="${escapeHtml(rc.url)}" target="_blank" rel="noopener">Openen</a>` +
+        `<button class="btn btn-sm btn-copy">Kopieer link</button>` +
+        `<button class="btn btn-sm btn-token">Nieuw token</button>` +
+        `<button class="btn btn-sm btn-gevaar btn-del">Verwijder</button>` +
       `</span>` +
     `</div>` +
     `<div class="rc-link mono">${escapeHtml(fullUrl)}</div>` +
     `<label class="rc-kol">Kolommen <input type="number" class="rc-kolommen" min="1" max="6" value="${rc.kolommen || 2}"></label>` +
     `<div class="rc-knoppen"></div>` +
-    `<div class="rc-card-acties"><button class="btn btn-add">+ Knop</button>` +
-    `<button class="btn btn-primair btn-save">Opslaan</button></div>`;
+    `<div class="rc-card-acties"><button class="btn btn-sm btn-add">Knop toevoegen</button>` +
+    `<button class="btn btn-primary btn-save">Opslaan</button></div>`;
 
   const knoppenEl = card.querySelector(".rc-knoppen");
 
@@ -102,7 +102,7 @@ function renderRemoteCard(rc) {
           `<option value="off">uit</option>` +
         `</select>` +
         `<div class="k-targets">${targetsHtml || '<span class="hint">geen devices</span>'}</div>` +
-        `<button class="btn btn-kdel" title="knop verwijderen">×</button>`;
+        `<button class="btn btn-sm btn-gevaar btn-kdel" title="knop verwijderen">×</button>`;
       krow.querySelector(".k-actie").value = k.actie || "toggle";
       krow.querySelector(".btn-kdel").addEventListener("click", () => {
         rc.knoppen.splice(ki, 1);
