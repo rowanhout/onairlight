@@ -40,6 +40,23 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+@app.on_event("startup")
+async def _seed_admin() -> None:
+    """Maak bij de eerste start optioneel een admin aan op basis van env-vars.
+    Handig voor cloud-deploys (Railway) zonder interactieve shell: zet
+    ONAIR_ADMIN_USER en ONAIR_ADMIN_PASSWORD en de gebruiker wordt eenmalig
+    aangemaakt als hij nog niet bestaat."""
+    gebruiker = os.getenv("ONAIR_ADMIN_USER")
+    wachtwoord = os.getenv("ONAIR_ADMIN_PASSWORD")
+    if gebruiker and wachtwoord and auth.get_user(gebruiker) is None:
+        auth.create_user(
+            gebruiker,
+            os.getenv("ONAIR_ADMIN_NAAM", gebruiker),
+            wachtwoord,
+            admin=True,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------

@@ -6,13 +6,19 @@ dit project los staat van de Montage Planning Dashboard.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
 import bcrypt
 from fastapi import Request
 
-USERS_FILE = Path(__file__).resolve().parent / "users.json"
+# Opslaglocatie. Standaard naast de code (lokaal draaien); in de cloud zet je
+# ONAIR_DATA_DIR naar een persistent volume (bijv. /data op Railway) zodat de
+# gebruikers niet verdwijnen bij een redeploy.
+_DATA_DIR = Path(os.getenv("ONAIR_DATA_DIR") or Path(__file__).resolve().parent)
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
+USERS_FILE = _DATA_DIR / "users.json"
 
 
 def _load_users() -> dict:

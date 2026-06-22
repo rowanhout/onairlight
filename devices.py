@@ -7,11 +7,16 @@ de laatst bekende status (aan/uit, online/offline).
 """
 
 import json
+import os
 import threading
 from pathlib import Path
 from typing import Optional
 
-LAMPS_FILE = Path(__file__).resolve().parent / "lamps.json"
+# Zelfde opslaglocatie als auth.py: standaard naast de code, in de cloud via
+# ONAIR_DATA_DIR naar een persistent volume.
+_DATA_DIR = Path(os.getenv("ONAIR_DATA_DIR") or Path(__file__).resolve().parent)
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
+LAMPS_FILE = _DATA_DIR / "lamps.json"
 
 # Eén lock zodat gelijktijdige WebSocket- en HTTP-handlers de JSON niet corrumperen.
 _lock = threading.Lock()

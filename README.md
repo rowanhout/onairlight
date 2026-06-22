@@ -48,6 +48,14 @@ Open daarna `http://<server-ip>:8080` en log in.
 > en de server niet rechtstreeks aan het internet bloot. Voor toegang van buiten
 > later: gebruik een VPN.
 
+## In de cloud draaien (Railway)
+
+Liever in de cloud i.p.v. op een lokale machine? Zie [`DEPLOY.md`](DEPLOY.md)
+voor een stap-voor-stap Railway-handleiding (persistent volume, env-variabelen
+en een automatische eerste-admin). Let op: dat zet de server publiek op
+internet — voor een betrouwbare broadcast-omgeving blijft LAN-only de
+robuustste keuze.
+
 ## Testen zonder hardware
 
 In een tweede terminal:
