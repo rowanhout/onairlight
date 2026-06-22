@@ -1,0 +1,92 @@
+// ============================================================================
+// config.h  --  Configuratie voor de On-Air Lamp ESP32-firmware
+// ============================================================================
+//
+// Kopieer dit bestand naar "config.h" en vul de waarden hieronder in.
+//   cp config.h.example config.h
+//
+// config.h staat (idealiter) in .gitignore zodat je per lamp eigen instellingen
+// kunt zetten zonder ze te committen.
+// ----------------------------------------------------------------------------
+
+#pragma once
+
+// ---------------------------------------------------------------------------
+// 1) BOARD-KEUZE
+// ---------------------------------------------------------------------------
+// Kies welk bord je gebruikt. De firmware leidt hieruit automatisch de juiste
+// Ethernet (LAN8720)-pinnen en de standaard lamp-GPIO af.
+//
+//   BOARD_OLIMEX_POE_ISO = 1   -> Olimex ESP32-POE-ISO   (standaard, besteld)
+//   BOARD_WT32_ETH01     = 2   -> WT32-ETH01
+//
+#define BOARD_OLIMEX_POE_ISO 1
+#define BOARD_WT32_ETH01     2
+
+#define BOARD BOARD_OLIMEX_POE_ISO
+
+// ---------------------------------------------------------------------------
+// 2) SERVER
+// ---------------------------------------------------------------------------
+// De centrale FastAPI-server waarmee de lamp als WebSocket-CLIENT verbindt.
+//
+//  CLOUD (Railway): de server draait achter HTTPS. Gebruik dan TLS (wss) op
+//                   poort 443.  Voorbeeld:
+//                       SERVER_HOST = "jouw-app.up.railway.app"
+//                       SERVER_PORT = 443
+//                       USE_TLS     = true        // -> wss://
+//
+//  LOKAAL (LAN):    de server draait gewoon op je netwerk zonder TLS. Gebruik
+//                   dan ws op poort 8080.  Voorbeeld:
+//                       SERVER_HOST = "192.168.1.50"
+//                       SERVER_PORT = 8080
+//                       USE_TLS     = false       // -> ws://
+//
+// LET OP: bij wss (USE_TLS = true) wordt het server-certificaat NIET
+// gevalideerd (insecure mode van arduinoWebSockets). De verbinding is wel
+// versleuteld, maar er is geen bescherming tegen man-in-the-middle. Voor een
+// vertrouwd LAN is gewoon ws (USE_TLS = false) simpeler en robuuster.
+//
+#define SERVER_HOST "192.168.1.50"   // hostnaam of IP van de server
+#define SERVER_PORT 8080             // 443 voor wss/cloud, 8080 voor ws/lokaal
+#define USE_TLS     false            // true = wss:// (cloud), false = ws:// (LAN)
+
+// ---------------------------------------------------------------------------
+// 3) IDENTITEIT VAN DEZE LAMP
+// ---------------------------------------------------------------------------
+// Deze waarden worden als URL-geencodeerde query-parameters meegestuurd:
+//   /ws/device?id=<LAMP_ID>&naam=<LAMP_NAAM>&ruimte=<LAMP_RUIMTE>
+// LAMP_ID moet UNIEK zijn per lamp (de server gebruikt dit als sleutel).
+//
+#define LAMP_ID     "studio-1"
+#define LAMP_NAAM   "Studio 1"
+#define LAMP_RUIMTE "Studio 1"
+
+// ---------------------------------------------------------------------------
+// 4) LAMP-GPIO
+// ---------------------------------------------------------------------------
+// GPIO die via een 220R gate-weerstand de MOSFET (IRLZ44N) aanstuurt.
+// Active-HIGH: GPIO HIGH = lamp AAN (ON AIR), GPIO LOW = lamp UIT.
+//
+//   -1  = gebruik de standaard-GPIO van het gekozen bord:
+//           Olimex ESP32-POE-ISO -> GPIO 32
+//           WT32-ETH01           -> GPIO 4
+//   >=0 = forceer een specifieke GPIO (overschrijft de board-default).
+//
+#define LAMP_PIN -1
+
+// ---------------------------------------------------------------------------
+// 5) HEARTBEAT
+// ---------------------------------------------------------------------------
+// Interval (in milliseconden) waarmee de lamp een {"type":"ping"} stuurt zodat
+// de server de verbinding als "online" blijft zien.
+//
+#define HEARTBEAT_MS 15000
+
+// ---------------------------------------------------------------------------
+// 6) OPTIONELE HOSTNAAM
+// ---------------------------------------------------------------------------
+// Haal het commentaar weg om een vaste netwerk-hostnaam te zetten (handig om de
+// lamp in je router/DHCP terug te vinden).
+//
+// #define LAMP_HOSTNAME "onair-studio-1"
