@@ -11,6 +11,7 @@ gemodelleerd op de bestaande houtprivate-app.
 import os
 from datetime import datetime, timezone
 
+import sentry_sdk
 from dotenv import load_dotenv
 from fastapi import (Depends, FastAPI, Form, Header, Request, WebSocket,
                      WebSocketDisconnect)
@@ -20,6 +21,12 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
+
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+    traces_sample_rate=0.1,
+)
 
 import auth
 import devices
