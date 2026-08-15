@@ -4,6 +4,28 @@
    Basis = de officiële drop-in CSS uit de Madera-stijlgids.
    =========================================================================== */
 
+/* -- Kopfonts (self-hosted in /static/fonts/) ------------------------- */
+@font-face {
+    font-family: 'Neue Metana';
+    src: url('/static/fonts/NeueMetanaRegular.otf') format('opentype');
+    font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+    font-family: 'Neue Metana';
+    src: url('/static/fonts/NeueMetanaBold.otf') format('opentype');
+    font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+    font-family: 'Selasy';
+    src: url('/static/fonts/SelasyRegular.otf') format('opentype');
+    font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+    font-family: 'Selasy';
+    src: url('/static/fonts/SelasyItalic.ttf') format('truetype');
+    font-weight: 400; font-style: italic; font-display: swap;
+}
+
 :root {
     --bg:            #123238;
     --bg-card:       #1a3e46;
