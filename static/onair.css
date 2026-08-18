@@ -81,8 +81,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 2.5rem 1.5rem; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-text strong { font-family: var(--font-hoofd); font-size: 1.05rem; font-weight: 700; letter-spacing: .04em; }
 .brand-sub { font-size: .72rem; font-weight: 400; color: var(--kleur-subtiel); }
-.site-nav { display: flex; align-items: center; gap: 1.2rem; font-size: .9rem; }
-.site-nav .nav-user { color: var(--kleur-subtiel); }
+.site-nav { display: flex; align-items: center; gap: .35rem; font-size: .9rem; }
+.site-nav a { color: var(--kleur-tekst); text-decoration: none; padding: .4rem .75rem; border-radius: 7px; transition: background .15s, color .15s; }
+.site-nav a:hover { background: rgba(165, 130, 250, .15); color: var(--kleur-accent); }
+.site-nav .nav-user { color: var(--kleur-subtiel); padding: 0 .5rem; }
 
 /* -- Koppen ----------------------------------------------------------- */
 .page-header { margin-bottom: 1.5rem; }
@@ -125,7 +127,7 @@ h2 { font-family: var(--font-hoofd); font-size: 1.2rem; font-weight: 700; margin
 .table tr:hover td { background: var(--bg-card-hover); }
 
 /* -- Formuliervelden — nooit witte inputs ---------------------------- */
-textarea, select,
+textarea, select, input:not([type]),
 input[type="text"], input[type="email"], input[type="password"],
 input[type="number"], input[type="search"], input[type="url"],
 input[type="tel"], input[type="date"], input[type="time"],
