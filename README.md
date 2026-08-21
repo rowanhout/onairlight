@@ -41,6 +41,12 @@ python create_user.py rowan "Rowan" --admin
 uvicorn server:app --host 0.0.0.0 --port 8080
 ```
 
+> `SECRET_KEY` is **verplicht** (minimaal 16 tekens) — zonder geldige waarde
+> stopt de server meteen bij het opstarten met een duidelijke foutmelding, in
+> plaats van onveilig door te draaien met een voorspelbare standaardwaarde.
+> Genereer er een met `openssl rand -hex 32` (of
+> `python -c "import secrets; print(secrets.token_hex(32))"`).
+
 Open daarna `http://<server-ip>:8080` en log in.
 
 > Draai dit op een altijd-aan machine in hetzelfde lokale netwerk als de lampen

@@ -11,6 +11,7 @@ import asyncio
 from typing import Dict, Optional
 
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 
 
 class ConnectionManager:
@@ -58,10 +59,41 @@ class ConnectionManager:
 
     # -- Device-sockets (ESP32's) ------------------------------------------
 
-    async def register_device(self, lamp_id: str, ws: WebSocket) -> None:
-        await ws.accept()
+    async def register_device(self, lamp_id: str, ws: WebSocket) -> bool:
+        """Accepteer een nieuwe device-verbinding voor ``lamp_id``, tenzij er
+        al een levende (nog open) socket voor dit id is geregistreerd.
+
+        Zonder deze check kan iedereen die het id van een bestaande lamp weet
+        (er is geen authenticatie op ``/ws/device``) zich ermee aanmelden en zo
+        de live verbinding overnemen: commando's gaan dan naar de aanvaller
+        i.p.v. naar de echte ESP32, terwijl de lamp in de UI gewoon
+        'online' lijkt. Door de overname te weigeren als de bestaande socket
+        nog daadwerkelijk open is, sluiten we die hijack af.
+
+        Een dode/gesloten oude socket (bv. na een netwerkblip of stroomstoring
+        van de ESP32) wordt gewoon vervangen — dat is een normale reconnect en
+        blijft dus mogelijk.
+
+        Geeft ``True`` als de verbinding is geaccepteerd, ``False`` als hij is
+        geweigerd. Bij ``False`` heeft deze aanroep de socket niet geaccepteerd;
+        de aanroeper moet hem sluiten (bv. met code 1008)."""
         async with self._lock:
+            bestaande = self._devices.get(lamp_id)
+            if bestaande is not None and self._is_alive(bestaande):
+                return False
+            await ws.accept()
             self._devices[lamp_id] = ws
+            return True
+
+    @staticmethod
+    def _is_alive(ws: WebSocket) -> bool:
+        """True als een eerder geregistreerde device-socket nog daadwerkelijk
+        open is (en niet alleen nog in de dict staat, bv. omdat de disconnect
+        nog niet is verwerkt)."""
+        return (
+            ws.client_state == WebSocketState.CONNECTED
+            and ws.application_state == WebSocketState.CONNECTED
+        )
 
     async def unregister_device(self, lamp_id: str) -> None:
         async with self._lock:

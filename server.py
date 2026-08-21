@@ -35,10 +35,24 @@ from hub import manager
 
 API_KEY = os.getenv("ONAIR_API_KEY", "")
 
+# SECRET_KEY ondertekent de sessiecookie. Zonder een eigen, geheime waarde kan
+# iedereen met itsdangerous zelf een geldige sessiecookie fabriceren (bv.
+# {"user": "rowan"}) en zo volledig als admin inloggen. Er is dus bewust GEEN
+# werkende default: ontbreekt of is de waarde te kort, dan stopt de server
+# meteen bij het opstarten in plaats van stilletjes onveilig door te draaien.
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if len(SECRET_KEY) < 16:
+    raise SystemExit(
+        "SECRET_KEY ontbreekt of is te kort (minimaal 16 tekens vereist).\n"
+        "Genereer een lange, willekeurige waarde en zet die als omgevingsvariabele, bijv.:\n"
+        "  openssl rand -hex 32\n"
+        "of: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+
 app = FastAPI(title="On-Air Lamp")
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "verander-mij-in-productie"),
+    secret_key=SECRET_KEY,
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -429,7 +443,12 @@ async def ws_device(ws: WebSocket):
     naam = ws.query_params.get("naam")
     ruimte = ws.query_params.get("ruimte")
 
-    await manager.register_device(lamp_id, ws)
+    if not await manager.register_device(lamp_id, ws):
+        # Er is al een levende device-socket voor dit id: weiger de overname
+        # i.p.v. de bestaande (mogelijk echte) ESP32 stilletjes te vervangen.
+        await ws.close(code=1008)  # policy violation: id al in gebruik
+        return
+
     velden = {"online": True, "last_seen": _now()}
     if naam:
         velden["naam"] = naam
