@@ -220,6 +220,7 @@ void startWebSocket() {
   // Bouw het pad inclusief URL-geencodeerde query-parameters.
   String pad = "/ws/device";
   pad += "?id=" + urlEncode(LAMP_ID);
+  pad += "&token=" + urlEncode(DEVICE_TOKEN);
   pad += "&naam=" + urlEncode(LAMP_NAAM);
   pad += "&ruimte=" + urlEncode(LAMP_RUIMTE);
 

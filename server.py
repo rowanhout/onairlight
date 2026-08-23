@@ -8,6 +8,7 @@ Opzet (SessionMiddleware/StaticFiles/Jinja2) en de auth-redirect-helpers zijn
 gemodelleerd op de bestaande houtprivate-app.
 """
 
+import hmac
 import os
 from datetime import datetime, timezone
 
@@ -34,6 +35,7 @@ import remotes
 from hub import manager
 
 API_KEY = os.getenv("ONAIR_API_KEY", "")
+DEVICE_TOKEN = os.getenv("ONAIR_DEVICE_TOKEN", "")
 
 app = FastAPI(title="On-Air Lamp")
 app.add_middleware(
@@ -418,12 +420,21 @@ async def ws_client(ws: WebSocket):
 
 @app.websocket("/ws/device")
 async def ws_device(ws: WebSocket):
-    """ESP32-lampen. Verbinden met ``?id=<lamp-id>`` (optioneel ``naam``,
-    ``ruimte``). De server registreert ze, synct de gewenste status en
-    verwerkt status/heartbeats."""
+    """ESP32-lampen. Verbinden met ``?id=<lamp-id>&token=<ONAIR_DEVICE_TOKEN>``
+    (optioneel ``naam``, ``ruimte``). De server registreert ze, synct de
+    gewenste status en verwerkt status/heartbeats.
+
+    ``token`` moet exact overeenkomen met de server-side ``ONAIR_DEVICE_TOKEN``.
+    Zonder geconfigureerde token worden alle device-verbindingen geweigerd —
+    dit endpoint stuurt fysieke hardware aan en mag nooit open staan voor
+    onbekende clients."""
     lamp_id = ws.query_params.get("id")
+    token = ws.query_params.get("token") or ""
     if not lamp_id:
         await ws.close(code=1008)  # policy violation: id verplicht
+        return
+    if not DEVICE_TOKEN or not hmac.compare_digest(token, DEVICE_TOKEN):
+        await ws.close(code=1008)  # policy violation: ontbrekende/foutieve token
         return
 
     naam = ws.query_params.get("naam")

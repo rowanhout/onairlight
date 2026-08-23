@@ -63,6 +63,15 @@
 #define LAMP_RUIMTE "Studio 1"
 
 // ---------------------------------------------------------------------------
+// 3b) DEVICE-TOKEN
+// ---------------------------------------------------------------------------
+// Gedeeld geheim dat de server verplicht van elke lamp verwacht (env var
+// ONAIR_DEVICE_TOKEN op de server). Zonder een geldige token weigert de
+// server de verbinding — vul hier dezelfde waarde in als op de server.
+//
+#define DEVICE_TOKEN "verander-mij-in-een-lang-random-geheim"
+
+// ---------------------------------------------------------------------------
 // 4) LAMP-GPIO
 // ---------------------------------------------------------------------------
 // GPIO die via een 220R gate-weerstand de MOSFET (IRLZ44N) aanstuurt.

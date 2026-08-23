@@ -61,7 +61,15 @@ class ConnectionManager:
     async def register_device(self, lamp_id: str, ws: WebSocket) -> None:
         await ws.accept()
         async with self._lock:
+            oude = self._devices.get(lamp_id)
             self._devices[lamp_id] = ws
+        if oude is not None and oude is not ws:
+            # Een nieuwe verbinding voor deze lamp-id vervangt de oude: sluit
+            # de oude socket expliciet i.p.v. hem stilzwijgend te laten hangen.
+            try:
+                await oude.close(code=1008)
+            except Exception:
+                pass
 
     async def unregister_device(self, lamp_id: str) -> None:
         async with self._lock:
