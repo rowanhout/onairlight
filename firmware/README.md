@@ -9,8 +9,11 @@ en meldt zijn werkelijke status terug.
 
 - De ESP32 verbindt met de server op pad `/ws/device` en geeft zijn identiteit
   mee als query-parameters:
-  `ws(s)://<host>:<poort>/ws/device?id=<id>&naam=<naam>&ruimte=<ruimte>`
-  (de waarden worden URL-geencodeerd).
+  `ws(s)://<host>:<poort>/ws/device?id=<id>&naam=<naam>&ruimte=<ruimte>&key=<sleutel>`
+  (de waarden worden URL-geencodeerd). `key` moet gelijk zijn aan de
+  `ONAIR_API_KEY` van de server zodra die daar is ingesteld — de server
+  weigert anders de verbinding (zie `config.h.example`), zodat niet elke
+  client op het netwerk een lamp-id kan registreren of kapen.
 - **Protocol** (JSON-tekstberichten):
   - server -> esp: `{"type":"command","state":true|false}` -> lamp schakelen en
     daarna echte status terugsturen.

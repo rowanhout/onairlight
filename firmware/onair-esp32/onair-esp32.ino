@@ -22,6 +22,14 @@
 
 #include "config.h"
 
+// Bestaande config.h-bestanden (van vóór de server-side sleutelcheck op
+// /ws/device) hebben ONAIR_API_KEY nog niet gedefinieerd — val dan terug op
+// leeg, wat overeenkomt met een server zonder ONAIR_API_KEY (geen sleutel
+// vereist).
+#ifndef ONAIR_API_KEY
+#define ONAIR_API_KEY ""
+#endif
+
 #include <ETH.h>
 #include <WiFi.h>               // levert WiFi.onEvent + ARDUINO_EVENT_ETH_* events
 #include <WebSocketsClient.h>   // links2004/arduinoWebSockets  (>= 2.4.0)
@@ -222,6 +230,12 @@ void startWebSocket() {
   pad += "?id=" + urlEncode(LAMP_ID);
   pad += "&naam=" + urlEncode(LAMP_NAAM);
   pad += "&ruimte=" + urlEncode(LAMP_RUIMTE);
+  // Vereist door de server zodra ONAIR_API_KEY daar is ingesteld, zodat niet
+  // elke client op het netwerk een lamp-id kan registreren/kapen.
+  String apiKey = ONAIR_API_KEY;
+  if (apiKey.length() > 0) {
+    pad += "&key=" + urlEncode(apiKey);
+  }
 
   Serial.printf("[ws] verbinden met %s://%s:%d%s\n",
                 USE_TLS ? "wss" : "ws", SERVER_HOST, SERVER_PORT, pad.c_str());

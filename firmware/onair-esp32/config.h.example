@@ -55,12 +55,18 @@
 // 3) IDENTITEIT VAN DEZE LAMP
 // ---------------------------------------------------------------------------
 // Deze waarden worden als URL-geencodeerde query-parameters meegestuurd:
-//   /ws/device?id=<LAMP_ID>&naam=<LAMP_NAAM>&ruimte=<LAMP_RUIMTE>
+//   /ws/device?id=<LAMP_ID>&naam=<LAMP_NAAM>&ruimte=<LAMP_RUIMTE>&key=<ONAIR_API_KEY>
 // LAMP_ID moet UNIEK zijn per lamp (de server gebruikt dit als sleutel).
 //
 #define LAMP_ID     "studio-1"
 #define LAMP_NAAM   "Studio 1"
 #define LAMP_RUIMTE "Studio 1"
+
+// Zelfde waarde als ONAIR_API_KEY op de server (.env). Zodra de server een
+// ONAIR_API_KEY heeft, weigert hij lamp-verbindingen zonder matchende sleutel
+// — dit voorkomt dat iemand anders op het netwerk een lamp-id kan kapen.
+// Leeg laten (`""`) als de server geen ONAIR_API_KEY heeft ingesteld.
+#define ONAIR_API_KEY "verander-deze-sleutel"
 
 // ---------------------------------------------------------------------------
 // 4) LAMP-GPIO

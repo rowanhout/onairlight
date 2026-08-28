@@ -30,7 +30,7 @@ Service → **Variables → New Variable**, voeg toe:
 | Variabele | Waarde | Toelichting |
 |-----------|--------|-------------|
 | `SECRET_KEY` | lange random string | `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `ONAIR_API_KEY` | je eigen sleutel | voor Companion / REST-API (`X-API-Key`) |
+| `ONAIR_API_KEY` | je eigen sleutel | voor Companion / REST-API (`X-API-Key`) én voor lampen (`/ws/device?key=`) — zet dezelfde waarde in `config.h` van elke ESP32 |
 | `ONAIR_DATA_DIR` | `/data` | wijst opslag naar het volume uit stap 2 |
 | `ONAIR_ADMIN_USER` | bv. `rowan` | eenmalige admin (zie stap 4) |
 | `ONAIR_ADMIN_PASSWORD` | sterk wachtwoord | "" |
@@ -66,7 +66,7 @@ python tools/fake_device.py --server wss://<jouw-app>.up.railway.app \
 
 ## ⚠️ Let op: internet-exposure
 Op Railway staat de control-server publiek op internet. Er is sessie-login +
-API-key, maar:
+API-key (ook voor lamp-verbindingen op `/ws/device`, zie hierboven), maar:
 - internet eruit = lampen niet schakelbaar;
 - meer aanvalsoppervlak dan LAN-only + VPN.
 

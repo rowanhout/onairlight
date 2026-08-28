@@ -9,6 +9,7 @@ gemodelleerd op de bestaande houtprivate-app.
 """
 
 import os
+import secrets
 from datetime import datetime, timezone
 
 import sentry_sdk
@@ -418,12 +419,19 @@ async def ws_client(ws: WebSocket):
 
 @app.websocket("/ws/device")
 async def ws_device(ws: WebSocket):
-    """ESP32-lampen. Verbinden met ``?id=<lamp-id>`` (optioneel ``naam``,
-    ``ruimte``). De server registreert ze, synct de gewenste status en
-    verwerkt status/heartbeats."""
+    """ESP32-lampen. Verbinden met ``?id=<lamp-id>&key=<ONAIR_API_KEY>``
+    (optioneel ``naam``, ``ruimte``). Is ``ONAIR_API_KEY`` gezet, dan moet
+    ``key`` daarmee overeenkomen — anders zou iedereen die de server kan
+    bereiken een lamp-id kunnen registreren/kapen. De server registreert
+    de lamp, synct de gewenste status en verwerkt status/heartbeats."""
     lamp_id = ws.query_params.get("id")
     if not lamp_id:
         await ws.close(code=1008)  # policy violation: id verplicht
+        return
+
+    device_key = ws.query_params.get("key")
+    if API_KEY and not (device_key and secrets.compare_digest(device_key, API_KEY)):
+        await ws.close(code=1008)  # policy violation: ongeldige/ontbrekende sleutel
         return
 
     naam = ws.query_params.get("naam")
