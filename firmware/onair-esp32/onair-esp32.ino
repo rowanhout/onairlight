@@ -97,6 +97,15 @@
   #define OA_PHY_TYPE ETH_PHY_LAN8720
 #endif
 
+// Standaard NTP-servers, zodat een oudere config.h zonder deze instellingen
+// gewoon blijft werken.
+#ifndef NTP_SERVER_1
+  #define NTP_SERVER_1 "pool.ntp.org"
+#endif
+#ifndef NTP_SERVER_2
+  #define NTP_SERVER_2 "time.cloudflare.com"
+#endif
+
 // Effectieve lamp-GPIO: gebruik LAMP_PIN uit config.h als die >= 0 is,
 // anders de standaard-GPIO van het gekozen bord.
 #if LAMP_PIN >= 0
@@ -287,28 +296,88 @@ void ethEvent(WiFiEvent_t event) {
 // de ESP32 dat het 1970 is en keurt hij elk certificaat af. Daarom halen we de
 // tijd op voordat we verbinden.
 #if USE_TLS
-void synchroniseerTijd() {
-  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
-  Serial.print("[tijd] NTP ophalen");
-  const time_t drempel = 1700000000;   // ergens in 2023; alles daarboven is echt
-  unsigned long start = millis();
+// Alles na deze datum beschouwen we als een echte klok (en niet 1970).
+static const time_t TIJD_DREMPEL = 1700000000;
+
+static bool tijdIsGeldig() {
+  return time(nullptr) > TIJD_DREMPEL;
+}
+
+static void printTijd() {
   time_t nu = time(nullptr);
-  while (nu < drempel && millis() - start < 15000) {
+  struct tm t;
+  gmtime_r(&nu, &t);
+  Serial.printf("[tijd] %04d-%02d-%02d %02d:%02d:%02d UTC\n",
+                t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
+                t.tm_hour, t.tm_min, t.tm_sec);
+}
+
+// Reservemethode: haal de tijd uit de "Date:"-header van een gewoon HTTP-
+// antwoord. Handig op netwerken waar NTP (UDP-poort 123) geblokkeerd is;
+// poort 80 staat vrijwel altijd open. We vragen het aan onze eigen server,
+// dus er is geen extra dienst nodig.
+static bool tijdViaHttpDate() {
+  WiFiClient client;
+  client.setTimeout(5000);
+  if (!client.connect(SERVER_HOST, 80)) {
+    Serial.println("[tijd] HTTP-verbinding voor tijd mislukt");
+    return false;
+  }
+  client.print(String("HEAD / HTTP/1.1\r\nHost: ") + SERVER_HOST +
+               "\r\nConnection: close\r\n\r\n");
+
+  unsigned long start = millis();
+  while (client.connected() && millis() - start < 5000) {
+    String regel = client.readStringUntil('\n');
+    if (regel.length() == 0) continue;
+    if (regel.startsWith("Date:") || regel.startsWith("date:")) {
+      String datum = regel.substring(5);
+      datum.trim();
+      // Voorbeeld: "Sun, 14 Sep 2026 19:25:00 GMT"
+      struct tm t = {};
+      if (strptime(datum.c_str(), "%a, %d %b %Y %H:%M:%S", &t) != nullptr) {
+        time_t epoch = mktime(&t);      // TZ staat op UTC, dus dit klopt
+        struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+        settimeofday(&tv, nullptr);
+        client.stop();
+        return tijdIsGeldig();
+      }
+      Serial.printf("[tijd] kon datum niet lezen: %s\n", datum.c_str());
+      break;
+    }
+    if (regel == "\r") break;   // einde van de headers
+  }
+  client.stop();
+  return false;
+}
+
+void synchroniseerTijd() {
+  // Werk in UTC, zodat mktime() hierboven geen tijdzone-correctie toepast.
+  setenv("TZ", "UTC0", 1);
+  tzset();
+
+  // 1) Gewoon NTP proberen.
+  configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);
+  Serial.print("[tijd] NTP ophalen");
+  unsigned long start = millis();
+  while (!tijdIsGeldig() && millis() - start < 8000) {
     delay(500);
     Serial.print(".");
-    nu = time(nullptr);
   }
   Serial.println();
-  if (nu < drempel) {
-    Serial.println("[tijd] LET OP: geen NTP-tijd; certificaatvalidatie zal falen.");
-    Serial.println("[tijd] Blokkeert je netwerk UDP-poort 123 (NTP)?");
-  } else {
-    struct tm tijd;
-    gmtime_r(&nu, &tijd);
-    Serial.printf("[tijd] %04d-%02d-%02d %02d:%02d:%02d UTC\n",
-                  tijd.tm_year + 1900, tijd.tm_mon + 1, tijd.tm_mday,
-                  tijd.tm_hour, tijd.tm_min, tijd.tm_sec);
+  if (tijdIsGeldig()) {
+    printTijd();
+    return;
   }
+
+  // 2) Lukt dat niet (UDP 123 dicht), dan via de HTTP-Date-header.
+  Serial.println("[tijd] NTP mislukt (UDP-poort 123 geblokkeerd?) -- nu via HTTP");
+  if (tijdViaHttpDate()) {
+    printTijd();
+    return;
+  }
+
+  Serial.println("[tijd] LET OP: geen tijd gevonden; certificaatvalidatie faalt.");
 }
 #endif
 

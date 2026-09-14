@@ -140,7 +140,24 @@
 // #define DNS_FALLBACK "1.1.1.1"     // Cloudflare DNS
 
 // ---------------------------------------------------------------------------
-// 9) GEVORDERD: vast IP-adres in plaats van DHCP
+// 9) TIJD (NTP) -- alleen nodig bij USE_TLS = true
+// ---------------------------------------------------------------------------
+// Voor wss:// wordt het servercertificaat gevalideerd, en daarvoor moet de klok
+// van de ESP32 kloppen. De firmware haalt de tijd op via NTP.
+//
+// Blokkeert je netwerk NTP (UDP-poort 123)? Geen probleem: de firmware valt dan
+// automatisch terug op de "Date"-header van een gewoon HTTP-antwoord van je
+// eigen server. Je hoeft daar niets voor in te stellen.
+//
+// Heeft je router een eigen NTP-server (veel routers hebben dat), dan kun je
+// die hier invullen -- dat werkt ook als internet-NTP geblokkeerd is:
+//
+#define NTP_SERVER_1 "pool.ntp.org"
+#define NTP_SERVER_2 "time.cloudflare.com"
+// #define NTP_SERVER_1 "192.168.2.1"     // bijv. het IP van je router
+
+// ---------------------------------------------------------------------------
+// 10) GEVORDERD: vast IP-adres in plaats van DHCP
 // ---------------------------------------------------------------------------
 // Blijft de lamp hangen op "[eth] wachten op netwerk (DHCP)..."? Dan geeft je
 // netwerk geen lease. Zet dan hieronder een vast adres. Voor een vaste
