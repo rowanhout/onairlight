@@ -36,14 +36,19 @@
 //
 // We gebruiken bewust OA_-namen: ETH.h definieert zelf al macro's met namen
 // als ETH_PHY_ADDR, en die willen we niet herdefinieren.
+// Waarden volgens de officiele Olimex-voorbeeldcode en user manual voor de
+// ESP32-POE2 (SOFTWARE/ARDUINO/LAN8720-POE2 en SOFTWARE/ESPHOME).
+// LET OP: de POE2 gebruikt een WROVER-module; die claimt GPIO16/17 voor PSRAM,
+// daarom loopt de Ethernet-klok hier over GPIO0 (en niet GPIO17 zoals op de
+// oudere POE/POE-ISO).
 #if BOARD == BOARD_OLIMEX_POE2
   #define BOARD_NAAM "Olimex ESP32-POE2"
   #define OA_DEF_PHY_ADDR   0
   #define OA_DEF_PHY_POWER  12
   #define OA_DEF_PHY_MDC    23
   #define OA_DEF_PHY_MDIO   18
-  #define OA_DEF_CLK_MODE   ETH_CLOCK_GPIO17_OUT
-  #define OA_DEF_LAMP_PIN   20
+  #define OA_DEF_CLK_MODE   ETH_CLOCK_GPIO0_OUT
+  #define OA_DEF_LAMP_PIN   4
 #elif BOARD == BOARD_OLIMEX_POE_ISO
   #define BOARD_NAAM "Olimex ESP32-POE-ISO"
   #define OA_DEF_PHY_ADDR   0

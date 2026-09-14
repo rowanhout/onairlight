@@ -58,12 +58,23 @@ Standaard lamp-GPIO per bord:
 
 | Bord                  | Lamp-GPIO |
 |-----------------------|-----------|
-| Olimex ESP32-POE2     | GPIO 20   |
+| Olimex ESP32-POE2     | GPIO 4    |
 | Olimex ESP32-POE-ISO  | GPIO 32   |
 | WT32-ETH01            | GPIO 4    |
 
-> Neem je lamp-GPIO nooit uit de Ethernet-pinnen. Op de Olimex RMII-borden zijn
-> GPIO 0, 12, 17, 18, 19, 21, 22, 23, 25, 26 en 27 in gebruik voor Ethernet.
+> Neem je lamp-GPIO nooit uit de Ethernet-pinnen.
+
+### Specifiek voor de Olimex ESP32-POE2
+
+Dit bord gebruikt een **WROVER**-module. Die claimt GPIO16/17 voor PSRAM,
+waardoor Olimex de Ethernet-klok naar **GPIO0** heeft verplaatst (op de oudere
+POE/POE-ISO is dat GPIO17). De firmware doet dat automatisch; dit is alleen ter
+info.
+
+Bezet op de POE2: GPIO 0 (Ethernet-klok), 12 (PHY power), 16/17 (PSRAM),
+18/19/21-23/25-27 (Ethernet), 1 (serieel), 2/14/15 (microSD).
+Vrij en geschikt als uitgang: **GPIO 4** (standaard), 13, 33, 5.
+**GPIO 20 bestaat niet op dit bord.**
 
 > De **+Led Strip / -Led Strip** klemmen zijn af-fabriek al bedraad. Niet
 > aankomen; alleen de twee **Control**-klemmen gebruik je voor de MOSFET.

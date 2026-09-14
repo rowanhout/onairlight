@@ -71,16 +71,24 @@
 // Active-HIGH: GPIO HIGH = lamp AAN (ON AIR), GPIO LOW = lamp UIT.
 //
 //   -1  = gebruik de standaard-GPIO van het gekozen bord:
-//           Olimex ESP32-POE2    -> GPIO 20
+//           Olimex ESP32-POE2    -> GPIO 4
 //           Olimex ESP32-POE-ISO -> GPIO 32
 //           WT32-ETH01           -> GPIO 4
 //   >=0 = forceer een specifieke GPIO (overschrijft de board-default).
 //
-// CONTROLEER dat de GPIO die je bedraadt niet botst met Ethernet. Op de Olimex
-// RMII-borden zijn 0, 12, 17, 18, 19, 21, 22, 23, 25, 26 en 27 in gebruik voor
-// Ethernet -- neem daar dus NOOIT je lamp-GPIO uit.
+// BEZET op de Olimex ESP32-POE2 (WROVER) -- hier NOOIT de lamp op aansluiten:
+//   GPIO 0                 -> Ethernet-klok
+//   GPIO 12                -> Ethernet PHY power
+//   GPIO 16, 17            -> PSRAM van de WROVER-module
+//   GPIO 18, 19, 21-23, 25-27 -> Ethernet (RMII/MDIO)
+//   GPIO 1                 -> seriele poort / programmeren
+//   GPIO 2, 14, 15         -> microSD (vrij als je geen SD-kaart gebruikt)
+//   GPIO 34-39             -> alleen ingang, kan niet schakelen
 //
-#define LAMP_PIN 20
+// VRIJ en geschikt als uitgang: GPIO 4 (standaard), 13, 33, en 5.
+// LET OP: GPIO 20 bestaat NIET op dit bord (de WROVER-module heeft die pin niet).
+//
+#define LAMP_PIN -1
 
 // ---------------------------------------------------------------------------
 // 5) HEARTBEAT
