@@ -155,16 +155,32 @@ String urlEncode(const String &waarde) {
 
 #ifdef DNS_FALLBACK
 // Sommige netwerken geven via DHCP geen (bruikbare) DNS-server mee. Met
-// DNS_FALLBACK in config.h forceren we er zelf een, zodat het opzoeken van de
-// servernaam toch lukt.
+// DNS_FALLBACK in config.h zetten we er zelf een achter.
+//
+// Let op de volgorde: de server uit DHCP blijft nummer 0, de fallback wordt
+// nummer 1. lwIP loopt ze in volgorde af, dus het netwerk zelf houdt voorrang
+// en we wijken alleen uit als dat niet antwoordt. Andersom -- de fallback op
+// nummer 0 -- gooit de DNS van het netwerk weg, en op netwerken die uitgaand
+// DNS-verkeer blokkeren (dezelfde die vaak ook NTP dichtzetten) blijft er dan
+// niets over dat wel werkt.
 #include <lwip/dns.h>
 void zetDnsFallback() {
   ip_addr_t dnsserver;
-  if (ipaddr_aton(DNS_FALLBACK, &dnsserver)) {
-    dns_setserver(0, &dnsserver);
-    Serial.printf("[eth] DNS-fallback ingesteld op %s\n", DNS_FALLBACK);
-  } else {
+  if (!ipaddr_aton(DNS_FALLBACK, &dnsserver)) {
     Serial.printf("[eth] ongeldige DNS_FALLBACK: %s\n", DNS_FALLBACK);
+    return;
+  }
+
+  const ip_addr_t * uitDhcp = dns_getserver(0);
+  bool dhcpBruikbaar = (uitDhcp != nullptr) && !ip_addr_isany(uitDhcp);
+
+  dns_setserver(dhcpBruikbaar ? 1 : 0, &dnsserver);
+  if (dhcpBruikbaar) {
+    Serial.printf("[eth] DNS: %s (netwerk) met %s als reserve\n",
+                  ipaddr_ntoa(uitDhcp), DNS_FALLBACK);
+  } else {
+    Serial.printf("[eth] DNS: netwerk levert er geen, dus %s gebruikt\n",
+                  DNS_FALLBACK);
   }
 }
 #endif

@@ -142,10 +142,16 @@
 // ---------------------------------------------------------------------------
 // Krijg je in de seriele monitor wel een IP-adres, maar meldingen als
 //   hostByName(): DNS Failed for <jouw server>
-// dan levert je DHCP-server geen bruikbare DNS mee. Forceer er dan zelf een:
+// dan levert je DHCP-server geen bruikbare DNS mee. Zet er dan zelf een achter:
 //
 // #define DNS_FALLBACK "8.8.8.8"     // Google DNS
 // #define DNS_FALLBACK "1.1.1.1"     // Cloudflare DNS
+//
+// De DNS-server van het netwerk zelf blijft gewoon de eerste keus; deze komt er
+// alleen achter als reserve. Zo blijf je werken op netwerken die uitgaand
+// DNS-verkeer naar buiten blokkeren -- daar is de DNS van de router juist de
+// enige die het doet. De zelftest bij het opstarten laat zien welke gebruikt
+// wordt en welk IP-adres eruit komt.
 
 // ---------------------------------------------------------------------------
 // 9) TIJD (NTP) -- alleen nodig bij USE_TLS = true
