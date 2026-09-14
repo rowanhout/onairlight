@@ -25,6 +25,13 @@
 
 #include <ETH.h>
 #include <WiFi.h>               // levert WiFi.onEvent + ARDUINO_EVENT_ETH_* events
+
+// Zet WS_DEBUG in config.h om de interne logging van de WebSocket-library aan
+// te zetten. Handig bij het uitzoeken van verbindings- of TLS-problemen; de
+// library print dan onder meer of het CA-certificaat wordt ingesteld.
+#ifdef WS_DEBUG
+  #define DEBUG_WEBSOCKETS(...) Serial.printf(__VA_ARGS__)
+#endif
 #include <WebSocketsClient.h>   // links2004/arduinoWebSockets  (>= 2.4.0)
 #include <ArduinoJson.h>        // bblanchon/ArduinoJson v7
 #include <time.h>
