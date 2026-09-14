@@ -367,6 +367,11 @@ void loop() {
     ethVerbonden = true;
     Serial.print("[eth] netwerk klaar (vast IP): ");
     Serial.println(ETH.localIP());
+    Serial.print("[eth] DNS      : ");
+    Serial.println(ETH.dnsIP());
+#ifdef DNS_FALLBACK
+    zetDnsFallback();
+#endif
   }
 #endif
 
