@@ -336,6 +336,23 @@ void setup() {
             OA_PHY_TYPE, OA_CLK_MODE);
 #endif
 
+#ifdef STATIC_IP
+  // Vast IP-adres in plaats van DHCP.
+  {
+    IPAddress ip, gw, sn, dns;
+    ip.fromString(STATIC_IP);
+    gw.fromString(STATIC_GATEWAY);
+    sn.fromString(STATIC_SUBNET);
+    dns.fromString(STATIC_DNS);
+    if (ETH.config(ip, gw, sn, dns)) {
+      Serial.printf("[eth] vast IP ingesteld: %s (gw %s, dns %s)\n",
+                    STATIC_IP, STATIC_GATEWAY, STATIC_DNS);
+    } else {
+      Serial.println("[eth] LET OP: vast IP instellen is mislukt");
+    }
+  }
+#endif
+
   // De WebSocket-client starten we pas zodra Ethernet een IP heeft (zie loop).
   // Eerder starten heeft geen zin: het opzoeken van de servernaam mislukt dan
   // en je krijgt een stroom "DNS Failed"-meldingen.
@@ -343,6 +360,16 @@ void setup() {
 }
 
 void loop() {
+#ifdef STATIC_IP
+  // Bij een vast IP komt het GOT_IP-event niet altijd; zodra de link er is en
+  // we een geldig adres hebben, beschouwen we het netwerk als klaar.
+  if (!ethVerbonden && ETH.linkUp() && ETH.localIP() != IPAddress(0, 0, 0, 0)) {
+    ethVerbonden = true;
+    Serial.print("[eth] netwerk klaar (vast IP): ");
+    Serial.println(ETH.localIP());
+  }
+#endif
+
   // Start de WebSocket-client zodra het netwerk klaar is (eenmalig).
   if (ethVerbonden && !wsGestart) {
     wsGestart = true;
