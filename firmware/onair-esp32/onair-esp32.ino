@@ -28,31 +28,67 @@
 #include <ArduinoJson.h>        // bblanchon/ArduinoJson v7
 
 // ===========================================================================
-// Board-afhankelijke Ethernet (RMII / LAN8720) configuratie
+// Board-afhankelijke Ethernet (RMII) configuratie
 // ===========================================================================
-// We leiden alle PHY-instellingen af uit BOARD (zie config.h).
-#if BOARD == BOARD_OLIMEX_POE_ISO
-  #define ETH_PHY_ADDR    0
-  #define ETH_PHY_POWER   12
-  #define ETH_PHY_MDC     23
-  #define ETH_PHY_MDIO    18
-  #define ETH_CLK_MODE    ETH_CLOCK_GPIO17_OUT
-  #define BOARD_LAMP_PIN  32
-  #define BOARD_NAAM      "Olimex ESP32-POE-ISO"
+// Alle PHY-instellingen worden afgeleid uit BOARD (zie config.h). Elke waarde
+// is te overrulen door hem in config.h zelf te #definen -- handig als een
+// board-revisie bijvoorbeeld een andere klok-modus gebruikt.
+//
+// We gebruiken bewust OA_-namen: ETH.h definieert zelf al macro's met namen
+// als ETH_PHY_ADDR, en die willen we niet herdefinieren.
+#if BOARD == BOARD_OLIMEX_POE2
+  #define BOARD_NAAM "Olimex ESP32-POE2"
+  #define OA_DEF_PHY_ADDR   0
+  #define OA_DEF_PHY_POWER  12
+  #define OA_DEF_PHY_MDC    23
+  #define OA_DEF_PHY_MDIO   18
+  #define OA_DEF_CLK_MODE   ETH_CLOCK_GPIO17_OUT
+  #define OA_DEF_LAMP_PIN   20
+#elif BOARD == BOARD_OLIMEX_POE_ISO
+  #define BOARD_NAAM "Olimex ESP32-POE-ISO"
+  #define OA_DEF_PHY_ADDR   0
+  #define OA_DEF_PHY_POWER  12
+  #define OA_DEF_PHY_MDC    23
+  #define OA_DEF_PHY_MDIO   18
+  #define OA_DEF_CLK_MODE   ETH_CLOCK_GPIO17_OUT
+  #define OA_DEF_LAMP_PIN   32
 #elif BOARD == BOARD_WT32_ETH01
-  #define ETH_PHY_ADDR    1
-  #define ETH_PHY_POWER   16
-  #define ETH_PHY_MDC     23
-  #define ETH_PHY_MDIO    18
-  #define ETH_CLK_MODE    ETH_CLOCK_GPIO0_IN
-  #define BOARD_LAMP_PIN  4
-  #define BOARD_NAAM      "WT32-ETH01"
+  #define BOARD_NAAM "WT32-ETH01"
+  #define OA_DEF_PHY_ADDR   1
+  #define OA_DEF_PHY_POWER  16
+  #define OA_DEF_PHY_MDC    23
+  #define OA_DEF_PHY_MDIO   18
+  #define OA_DEF_CLK_MODE   ETH_CLOCK_GPIO0_IN
+  #define OA_DEF_LAMP_PIN   4
 #else
-  #error "Onbekend BOARD in config.h (kies BOARD_OLIMEX_POE_ISO of BOARD_WT32_ETH01)"
+  #error "Onbekend BOARD in config.h (kies BOARD_OLIMEX_POE2, BOARD_OLIMEX_POE_ISO of BOARD_WT32_ETH01)"
 #endif
 
-// De PHY is altijd een LAN8720 voor de ondersteunde borden.
-#define ETH_PHY_TYPE ETH_PHY_LAN8720
+// Board-defaults toepassen, tenzij config.h ze al heeft gezet.
+#ifndef OA_PHY_ADDR
+  #define OA_PHY_ADDR OA_DEF_PHY_ADDR
+#endif
+#ifndef OA_PHY_POWER
+  #define OA_PHY_POWER OA_DEF_PHY_POWER
+#endif
+#ifndef OA_PHY_MDC
+  #define OA_PHY_MDC OA_DEF_PHY_MDC
+#endif
+#ifndef OA_PHY_MDIO
+  #define OA_PHY_MDIO OA_DEF_PHY_MDIO
+#endif
+#ifndef OA_CLK_MODE
+  #define OA_CLK_MODE OA_DEF_CLK_MODE
+#endif
+#ifndef BOARD_LAMP_PIN
+  #define BOARD_LAMP_PIN OA_DEF_LAMP_PIN
+#endif
+
+// De PHY is een LAN8710/LAN8720 op alle ondersteunde borden (register-
+// compatibel; de LAN8720-driver werkt voor beide).
+#ifndef OA_PHY_TYPE
+  #define OA_PHY_TYPE ETH_PHY_LAN8720
+#endif
 
 // Effectieve lamp-GPIO: gebruik LAMP_PIN uit config.h als die >= 0 is,
 // anders de standaard-GPIO van het gekozen bord.
@@ -263,12 +299,12 @@ void setup() {
 
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
   // Arduino-ESP32 core 3.x signatuur
-  ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_MDC, ETH_PHY_MDIO,
-            ETH_PHY_POWER, ETH_CLK_MODE);
+  ETH.begin(OA_PHY_TYPE, OA_PHY_ADDR, OA_PHY_MDC, OA_PHY_MDIO,
+            OA_PHY_POWER, OA_CLK_MODE);
 #else
   // Arduino-ESP32 core 2.x signatuur
-  ETH.begin(ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO,
-            ETH_PHY_TYPE, ETH_CLK_MODE);
+  ETH.begin(OA_PHY_ADDR, OA_PHY_POWER, OA_PHY_MDC, OA_PHY_MDIO,
+            OA_PHY_TYPE, OA_CLK_MODE);
 #endif
 
   // --- WebSocket-client starten ---

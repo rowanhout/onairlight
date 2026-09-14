@@ -15,15 +15,17 @@
 // 1) BOARD-KEUZE
 // ---------------------------------------------------------------------------
 // Kies welk bord je gebruikt. De firmware leidt hieruit automatisch de juiste
-// Ethernet (LAN8720)-pinnen en de standaard lamp-GPIO af.
+// Ethernet (RMII/LAN8710-LAN8720)-pinnen en de standaard lamp-GPIO af.
 //
-//   BOARD_OLIMEX_POE_ISO = 1   -> Olimex ESP32-POE-ISO   (standaard, besteld)
+//   BOARD_OLIMEX_POE2    = 3   -> Olimex ESP32-POE2   (standaard, in gebruik)
+//   BOARD_OLIMEX_POE_ISO = 1   -> Olimex ESP32-POE-ISO
 //   BOARD_WT32_ETH01     = 2   -> WT32-ETH01
 //
 #define BOARD_OLIMEX_POE_ISO 1
 #define BOARD_WT32_ETH01     2
+#define BOARD_OLIMEX_POE2    3
 
-#define BOARD BOARD_OLIMEX_POE_ISO
+#define BOARD BOARD_OLIMEX_POE2
 
 // ---------------------------------------------------------------------------
 // 2) SERVER
@@ -69,11 +71,16 @@
 // Active-HIGH: GPIO HIGH = lamp AAN (ON AIR), GPIO LOW = lamp UIT.
 //
 //   -1  = gebruik de standaard-GPIO van het gekozen bord:
+//           Olimex ESP32-POE2    -> GPIO 20
 //           Olimex ESP32-POE-ISO -> GPIO 32
 //           WT32-ETH01           -> GPIO 4
 //   >=0 = forceer een specifieke GPIO (overschrijft de board-default).
 //
-#define LAMP_PIN -1
+// CONTROLEER dat de GPIO die je bedraadt niet botst met Ethernet. Op de Olimex
+// RMII-borden zijn 0, 12, 17, 18, 19, 21, 22, 23, 25, 26 en 27 in gebruik voor
+// Ethernet -- neem daar dus NOOIT je lamp-GPIO uit.
+//
+#define LAMP_PIN 20
 
 // ---------------------------------------------------------------------------
 // 5) HEARTBEAT
@@ -90,3 +97,26 @@
 // lamp in je router/DHCP terug te vinden).
 //
 // #define LAMP_HOSTNAME "onair-studio-1"
+
+// ---------------------------------------------------------------------------
+// 7) GEVORDERD: Ethernet-instellingen overrulen
+// ---------------------------------------------------------------------------
+// Normaal hoef je hier NIETS te doen: de firmware kiest de juiste PHY-pinnen
+// op basis van BOARD hierboven.
+//
+// Komt Ethernet niet op (geen "[eth] IP-adres" in de seriele monitor, terwijl
+// de kabel in een werkende switch zit)? Dan wijkt jouw board-revisie mogelijk
+// af in de klok-modus. Haal dan een van deze regels uit commentaar en probeer
+// opnieuw -- dit is verreweg de meest voorkomende afwijking:
+//
+// #define OA_CLK_MODE ETH_CLOCK_GPIO0_IN     // externe 50MHz oscillator
+// #define OA_CLK_MODE ETH_CLOCK_GPIO0_OUT    // klok uit op GPIO0
+// #define OA_CLK_MODE ETH_CLOCK_GPIO16_OUT   // klok uit op GPIO16
+// #define OA_CLK_MODE ETH_CLOCK_GPIO17_OUT   // klok uit op GPIO17 (Olimex-standaard)
+//
+// De overige PHY-instellingen kun je op dezelfde manier forceren:
+//
+// #define OA_PHY_ADDR  0
+// #define OA_PHY_POWER 12
+// #define OA_PHY_MDC   23
+// #define OA_PHY_MDIO  18

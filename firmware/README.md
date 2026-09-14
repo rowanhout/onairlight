@@ -36,9 +36,13 @@ lamp **laag-zijdig** via een logic-level MOSFET (IRLZ44N) op de twee
 
 Stroomvoorziening van de 12V:
 
-- **Olimex ESP32-POE-ISO:** het bord is PoE-gevoed. De 12V voor de lamp komt uit
-  een 5V -> 12V boost-converter.
-- **WT32-ETH01:** de 12V komt rechtstreeks uit de PoE-splitter.
+- **Olimex ESP32-POE2 (aanbevolen):** het bord haalt 802.3at-PoE (25W) uit de
+  UTP-kabel en levert zelf **12V @ 2A**. De lamp (12V / ~0,45A) hangt dus
+  rechtstreeks aan de 12V-uitgang van het bord. **Geen PoE-splitter en geen
+  buck/boost-converter nodig** -- een UTP-kabel de lamp in en klaar.
+- **Olimex ESP32-POE-ISO:** het bord is PoE-gevoed maar levert extern maar ~1W;
+  te weinig voor de lamp. De 12V moet dan van een aparte bron komen.
+- **WT32-ETH01:** de 12V komt rechtstreeks uit een PoE-splitter.
 
 MOSFET-bedrading (IRLZ44N), laag-zijdig op de twee Control-klemmen:
 
@@ -54,8 +58,12 @@ Standaard lamp-GPIO per bord:
 
 | Bord                  | Lamp-GPIO |
 |-----------------------|-----------|
+| Olimex ESP32-POE2     | GPIO 20   |
 | Olimex ESP32-POE-ISO  | GPIO 32   |
 | WT32-ETH01            | GPIO 4    |
+
+> Neem je lamp-GPIO nooit uit de Ethernet-pinnen. Op de Olimex RMII-borden zijn
+> GPIO 0, 12, 17, 18, 19, 21, 22, 23, 25, 26 en 27 in gebruik voor Ethernet.
 
 > De **+Led Strip / -Led Strip** klemmen zijn af-fabriek al bedraad. Niet
 > aankomen; alleen de twee **Control**-klemmen gebruik je voor de MOSFET.
@@ -70,7 +78,8 @@ cp firmware/onair-esp32/config.h.example firmware/onair-esp32/config.h
 
 Stel in `config.h` minimaal in:
 
-- `BOARD` -> `BOARD_OLIMEX_POE_ISO` (standaard) of `BOARD_WT32_ETH01`.
+- `BOARD` -> `BOARD_OLIMEX_POE2` (standaard), `BOARD_OLIMEX_POE_ISO` of
+  `BOARD_WT32_ETH01`.
 - `SERVER_HOST`, `SERVER_PORT`, `USE_TLS` (zie ws vs wss hieronder).
 - `LAMP_ID` (uniek!), `LAMP_NAAM`, `LAMP_RUIMTE`.
 - Eventueel `LAMP_PIN` (`-1` = board-default) en `HEARTBEAT_MS` (15000).
@@ -87,11 +96,24 @@ Stel in `config.h` minimaal in:
   (insecure mode van arduinoWebSockets >= 2.4.0). De verbinding is versleuteld,
   maar niet beschermd tegen man-in-the-middle.
 
+## Aansluiten om te flashen
+
+- **Olimex ESP32-POE2:** heeft een **USB-C-poort met USB-serial aan boord**.
+  Kabel in de PC, klaar -- je hebt géén losse USB-TTL-adapter nodig en je hoeft
+  geen knop in te drukken. Verschijnt er geen poort, installeer dan de driver
+  van de USB-serial chip (CH340 of CP210x).
+  *Flash het bord bij voorkeur via USB zonder dat de PoE-kabel erin zit.*
+- **Olimex ESP32-POE-ISO:** idem, via de USB-poort op het bord.
+- **WT32-ETH01:** heeft géén USB. Gebruik een USB-naar-TTL-adapter (3,3V),
+  verbind TX/RX gekruist + GND + 5V, en trek **IO0 naar GND** tijdens het
+  opstarten om in de bootloader te komen.
+
 ## Flashen via PlatformIO
 
 ```sh
 cd firmware/onair-esp32
-pio run -e olimex -t upload        # Olimex ESP32-POE-ISO (standaard)
+pio run -e poe2 -t upload          # Olimex ESP32-POE2 (standaard)
+pio run -e olimex -t upload        # Olimex ESP32-POE-ISO
 pio run -e wt32-eth01 -t upload    # WT32-ETH01
 pio device monitor                 # seriele monitor (115200 baud)
 ```
@@ -102,8 +124,10 @@ pio device monitor                 # seriele monitor (115200 baud)
    `https://espressif.github.io/arduino-esp32/package_esp32_index.json`
 2. Installeer via **Tools -> Board -> Boards Manager** het pakket
    **esp32** (van Espressif).
-3. Kies het juiste bord onder **Tools -> Board**:
-   - Olimex: **OLIMEX ESP32-PoE-ISO**
+3. Kies het juiste bord onder **Tools -> Board -> esp32**:
+   - ESP32-POE2: **OLIMEX ESP32-POE2** (staat die er niet in jouw core-versie?
+     kies dan **OLIMEX ESP32-PoE** -- zelfde ESP32, werkt prima)
+   - ESP32-POE-ISO: **OLIMEX ESP32-PoE-ISO**
    - WT32-ETH01: **ESP32 Dev Module**
 4. Installeer via **Tools -> Bibliotheken beheren** de libraries:
    - **arduinoWebSockets** (links2004) - versie >= 2.4.0
