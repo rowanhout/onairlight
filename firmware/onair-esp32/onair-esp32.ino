@@ -316,39 +316,63 @@ static void printTijd() {
 // antwoord. Handig op netwerken waar NTP (UDP-poort 123) geblokkeerd is;
 // poort 80 staat vrijwel altijd open. We vragen het aan onze eigen server,
 // dus er is geen extra dienst nodig.
+static bool zetTijdUitDatumRegel(const String & datum) {
+  // Voorbeeld: "Sun, 14 Sep 2026 19:25:00 GMT"
+  struct tm t = {};
+  if (strptime(datum.c_str(), "%a, %d %b %Y %H:%M:%S", &t) == nullptr) {
+    Serial.printf("[tijd] kon datum niet lezen: %s\n", datum.c_str());
+    return false;
+  }
+  time_t epoch = mktime(&t);            // TZ staat op UTC, dus dit klopt
+  struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+  settimeofday(&tv, nullptr);
+  return tijdIsGeldig();
+}
+
 static bool tijdViaHttpDate() {
   WiFiClient client;
-  client.setTimeout(5000);
-  if (!client.connect(SERVER_HOST, 80)) {
-    Serial.println("[tijd] HTTP-verbinding voor tijd mislukt");
+  // LET OP: WiFiClient::setTimeout() rekent op de ESP32 in SECONDEN.
+  client.setTimeout(5);
+
+  Serial.printf("[tijd] verbinden met %s:80 ...\n", SERVER_HOST);
+  if (!client.connect(SERVER_HOST, 80, 5000)) {   // connect-timeout wel in ms
+    Serial.println("[tijd] HTTP-verbinding mislukt (poort 80 dicht?)");
     return false;
   }
   client.print(String("HEAD / HTTP/1.1\r\nHost: ") + SERVER_HOST +
                "\r\nConnection: close\r\n\r\n");
 
+  // Zelf de tijd bewaken in plaats van op de stream-timeout vertrouwen.
+  String regel;
+  bool gelukt = false;
   unsigned long start = millis();
-  while (client.connected() && millis() - start < 5000) {
-    String regel = client.readStringUntil('\n');
-    if (regel.length() == 0) continue;
-    if (regel.startsWith("Date:") || regel.startsWith("date:")) {
-      String datum = regel.substring(5);
-      datum.trim();
-      // Voorbeeld: "Sun, 14 Sep 2026 19:25:00 GMT"
-      struct tm t = {};
-      if (strptime(datum.c_str(), "%a, %d %b %Y %H:%M:%S", &t) != nullptr) {
-        time_t epoch = mktime(&t);      // TZ staat op UTC, dus dit klopt
-        struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
-        settimeofday(&tv, nullptr);
-        client.stop();
-        return tijdIsGeldig();
+  while (millis() - start < 8000) {
+    while (client.available()) {
+      char c = (char)client.read();
+      if (c == '\r') continue;
+      if (c != '\n') {
+        if (regel.length() < 160) regel += c;
+        continue;
       }
-      Serial.printf("[tijd] kon datum niet lezen: %s\n", datum.c_str());
-      break;
+      if (regel.length() == 0) {        // lege regel = einde van de headers
+        client.stop();
+        return gelukt;
+      }
+      if (regel.startsWith("Date:") || regel.startsWith("date:")) {
+        String datum = regel.substring(5);
+        datum.trim();
+        gelukt = zetTijdUitDatumRegel(datum);
+        client.stop();
+        return gelukt;
+      }
+      regel = "";
     }
-    if (regel == "\r") break;   // einde van de headers
+    if (!client.connected() && !client.available()) break;
+    delay(10);
   }
   client.stop();
-  return false;
+  Serial.println("[tijd] geen Date-header ontvangen");
+  return gelukt;
 }
 
 void synchroniseerTijd() {
