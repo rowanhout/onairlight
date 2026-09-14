@@ -375,29 +375,66 @@ static bool tijdViaHttpDate() {
   return gelukt;
 }
 
+static bool probeerNtp(const char * server1, const char * server2, uint32_t maxWachtMs) {
+  configTime(0, 0, server1, server2);
+  unsigned long start = millis();
+  while (!tijdIsGeldig() && millis() - start < maxWachtMs) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+  return tijdIsGeldig();
+}
+
+// Laatste redmiddel: de bouwtijd van deze firmware. Niet exact, maar ruim
+// nauwkeurig genoeg om de geldigheidsperiode van een certificaat te toetsen.
+static bool tijdUitBuild() {
+  char stempel[40];
+  snprintf(stempel, sizeof(stempel), "%s %s", __DATE__, __TIME__);
+  struct tm t = {};
+  if (strptime(stempel, "%b %d %Y %H:%M:%S", &t) == nullptr) return false;
+  time_t epoch = mktime(&t);
+  struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+  settimeofday(&tv, nullptr);
+  return tijdIsGeldig();
+}
+
 void synchroniseerTijd() {
   // Werk in UTC, zodat mktime() hierboven geen tijdzone-correctie toepast.
   setenv("TZ", "UTC0", 1);
   tzset();
 
-  // 1) Gewoon NTP proberen.
-  configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);
+  // 1) NTP via de ingestelde servers (internet).
   Serial.print("[tijd] NTP ophalen");
-  unsigned long start = millis();
-  while (!tijdIsGeldig() && millis() - start < 8000) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-  if (tijdIsGeldig()) {
+  if (probeerNtp(NTP_SERVER_1, NTP_SERVER_2, 8000)) {
     printTijd();
     return;
   }
 
-  // 2) Lukt dat niet (UDP 123 dicht), dan via de HTTP-Date-header.
-  Serial.println("[tijd] NTP mislukt (UDP-poort 123 geblokkeerd?) -- nu via HTTP");
+  // 2) NTP via de router zelf: dat verkeer blijft binnen het eigen netwerk en
+  //    wordt dus niet door een internetfilter tegengehouden.
+  static char gateway[20] = {0};
+  ETH.gatewayIP().toString().toCharArray(gateway, sizeof(gateway));
+  if (strlen(gateway) > 0 && strcmp(gateway, "0.0.0.0") != 0) {
+    Serial.printf("[tijd] NTP via de router (%s)", gateway);
+    if (probeerNtp(gateway, nullptr, 5000)) {
+      printTijd();
+      return;
+    }
+  }
+
+  // 3) Tijd uit de Date-header van een gewoon HTTP-antwoord.
+  Serial.println("[tijd] NTP mislukt -- nu via HTTP");
   if (tijdViaHttpDate()) {
     printTijd();
+    return;
+  }
+
+  // 4) Niets werkte: val terug op de bouwdatum van deze firmware.
+  Serial.println("[tijd] HTTP mislukt -- val terug op de bouwdatum van de firmware");
+  if (tijdUitBuild()) {
+    printTijd();
+    Serial.println("[tijd] (bij benadering, maar genoeg om het certificaat te toetsen)");
     return;
   }
 
