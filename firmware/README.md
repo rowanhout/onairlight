@@ -91,28 +91,66 @@ Stel in `config.h` minimaal in:
 
 - `BOARD` -> `BOARD_OLIMEX_POE2` (standaard), `BOARD_OLIMEX_POE_ISO` of
   `BOARD_WT32_ETH01`.
-- `SERVER_HOST`, `SERVER_PORT`, `USE_TLS` (zie ws vs wss hieronder).
+- `SERVER_HOST`, `SERVER_PORT`, `USE_TLS` (zie "Hoe de lamp met de server
+  verbindt" hieronder).
 - `LAMP_ID` (uniek!), `LAMP_NAAM`, `LAMP_RUIMTE`.
 - Eventueel `LAMP_PIN` (`-1` = board-default) en `HEARTBEAT_MS` (15000).
 - Optioneel `LAMP_HOSTNAME` (uitgecommentarieerd) voor een vaste netwerknaam.
 
-## ws (LAN) vs wss (cloud)
+## Hoe de lamp met de server verbindt
 
-- **ws (LAN, simpel en robuust):** server draait lokaal op je netwerk zonder
-  TLS. Zet `USE_TLS = false`, `SERVER_PORT = 8080`. Aanbevolen op een vertrouwd
-  LAN.
-- **wss (cloud / Railway):** server draait achter HTTPS. Zet `USE_TLS = true`,
-  `SERVER_PORT = 443`.
-  Het servercertificaat wordt **gevalideerd** tegen de root-certificaten in
-  `certs.h` (Let's Encrypt ISRG Root X1/X2 + DigiCert Global Root G2). De
-  verbinding is dus versleuteld én beschermd tegen man-in-the-middle.
-  Omdat certificaatvalidatie een kloppende klok vereist, haalt de firmware
-  eerst de tijd op via NTP (UDP-poort 123 moet open staan).
+Er zijn drie manieren; kies er één in `config.h`.
+
+### 1. Cloud via de Railway TCP-proxy (in gebruik)
+
+Railway biedt dezelfde app naast HTTPS ook aan op een kale TCP-poort. Daar zit
+geen TLS voor, dus de ESP32 praat gewoon `ws://`: geen certificaten, geen
+klok-synchronisatie, geen mbedTLS.
+
+```c
+#define SERVER_HOST "altaria.proxy.rlwy.net"
+#define SERVER_PORT 35261
+#define USE_TLS     false
+```
+
+Het verkeer over die poort is **niet versleuteld**. Wat er overheen gaat is
+alleen de aan/uit-stand van een lamp plus de lamp-id, dus dat is hier
+acceptabel; zet er geen gevoelige gegevens op. De web-app zelf blijft gewoon
+via HTTPS op `reclamp.madera.video` draaien.
+
+> De TCP-proxy wijst naar poort 8080 in de container — dezelfde poort waarop
+> uvicorn luistert. Maakt Railway ooit een nieuwe proxy aan, dan verandert de
+> poort en moet `SERVER_PORT` mee.
+
+### 2. Cloud via HTTPS (wss)
+
+```c
+#define SERVER_HOST "reclamp.madera.video"
+#define SERVER_PORT 443
+#define USE_TLS     true
+```
+
+Het servercertificaat wordt **gevalideerd** tegen de root-certificaten in
+`certs.h` (Let's Encrypt ISRG Root X1/X2 + DigiCert Global Root G2). Omdat
+validatie een kloppende klok vereist, haalt de firmware eerst de tijd op: NTP,
+dan NTP via de router, dan de `Date`-header van een HTTP-antwoord, en als laatste
+de bouwdatum van de firmware.
 
 > Waarom `beginSslWithCA()` en niet `beginSSL()`? Afhankelijk van de versie van
 > arduinoWebSockets zet `beginSSL()` de "insecure" modus niet, waarna de
 > handshake faalt met `start_ssl_client: -1`. De CA-variant werkt op elke
 > versie én is veiliger.
+>
+> Faalt de handshake op jouw netwerk alsnog met `start_ssl_client: -1` (sommige
+> netwerken breken TLS open of blokkeren het), gebruik dan optie 1.
+
+### 3. Lokaal op het LAN
+
+```c
+#define SERVER_HOST "192.168.1.50"
+#define SERVER_PORT 8080
+#define USE_TLS     false
+```
 
 ## Aansluiten om te flashen
 

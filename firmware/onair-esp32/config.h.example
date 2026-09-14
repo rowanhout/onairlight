@@ -32,26 +32,34 @@
 // ---------------------------------------------------------------------------
 // De centrale FastAPI-server waarmee de lamp als WebSocket-CLIENT verbindt.
 //
-//  CLOUD (Railway): de server draait achter HTTPS. Gebruik dan TLS (wss) op
-//                   poort 443.  Voorbeeld:
-//                       SERVER_HOST = "jouw-app.up.railway.app"
+//  CLOUD via de Railway TCP-PROXY (aanbevolen, en wat we nu gebruiken):
+//                   Railway kan de app naast HTTPS ook op een kale TCP-poort
+//                   aanbieden. Daar zit geen TLS voor, dus de ESP32 praat
+//                   gewoon ws:// -- geen certificaten, geen klok, geen gedoe.
+//                       SERVER_HOST = "altaria.proxy.rlwy.net"
+//                       SERVER_PORT = 35261
+//                       USE_TLS     = false       // -> ws://
+//
+//  CLOUD via HTTPS: dezelfde server, maar via het normale webadres. Dan is TLS
+//                   verplicht:
+//                       SERVER_HOST = "reclamp.madera.video"
 //                       SERVER_PORT = 443
 //                       USE_TLS     = true        // -> wss://
 //
-//  LOKAAL (LAN):    de server draait gewoon op je netwerk zonder TLS. Gebruik
-//                   dan ws op poort 8080.  Voorbeeld:
+//  LOKAAL (LAN):    de server draait op je eigen netwerk zonder TLS:
 //                       SERVER_HOST = "192.168.1.50"
 //                       SERVER_PORT = 8080
 //                       USE_TLS     = false       // -> ws://
 //
-// LET OP: bij wss (USE_TLS = true) wordt het server-certificaat NIET
-// gevalideerd (insecure mode van arduinoWebSockets). De verbinding is wel
-// versleuteld, maar er is geen bescherming tegen man-in-the-middle. Voor een
-// vertrouwd LAN is gewoon ws (USE_TLS = false) simpeler en robuuster.
+// Bij wss (USE_TLS = true) wordt het servercertificaat WEL gevalideerd, tegen
+// de root-certificaten in certs.h. Dat vereist een kloppende klok; de firmware
+// haalt die eerst op (zie punt 9). Werkt de TLS-handshake op jouw netwerk niet
+// (melding "start_ssl_client: -1"), gebruik dan de TCP-proxy hierboven: dat is
+// dezelfde server, alleen zonder de TLS-laag.
 //
-#define SERVER_HOST "192.168.1.50"   // hostnaam of IP van de server
-#define SERVER_PORT 8080             // 443 voor wss/cloud, 8080 voor ws/lokaal
-#define USE_TLS     false            // true = wss:// (cloud), false = ws:// (LAN)
+#define SERVER_HOST "altaria.proxy.rlwy.net"  // hostnaam of IP van de server
+#define SERVER_PORT 35261                     // TCP-proxy van Railway
+#define USE_TLS     false                     // true = wss://, false = ws://
 
 // ---------------------------------------------------------------------------
 // 3) IDENTITEIT VAN DEZE LAMP
@@ -141,6 +149,7 @@
 
 // ---------------------------------------------------------------------------
 // 9) TIJD (NTP) -- alleen nodig bij USE_TLS = true
+//    (gebruik je de TCP-proxy, dan wordt dit hele blok niet eens meegecompileerd)
 // ---------------------------------------------------------------------------
 // Voor wss:// wordt het servercertificaat gevalideerd, en daarvoor moet de klok
 // van de ESP32 kloppen. De firmware haalt de tijd op via NTP.
