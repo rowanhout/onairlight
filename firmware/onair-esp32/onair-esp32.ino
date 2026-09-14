@@ -105,6 +105,7 @@ WebSocketsClient ws;
 
 static bool lampAan = false;        // huidige werkelijke lampstatus
 static bool ethVerbonden = false;   // heeft Ethernet een IP-adres?
+static bool wsGestart = false;      // is de WebSocket-client al gestart?
 static unsigned long laatsteHeartbeat = 0;
 
 // ===========================================================================
@@ -131,6 +132,22 @@ String urlEncode(const String &waarde) {
   }
   return uit;
 }
+
+#ifdef DNS_FALLBACK
+// Sommige netwerken geven via DHCP geen (bruikbare) DNS-server mee. Met
+// DNS_FALLBACK in config.h forceren we er zelf een, zodat het opzoeken van de
+// servernaam toch lukt.
+#include <lwip/dns.h>
+void zetDnsFallback() {
+  ip_addr_t dnsserver;
+  if (ipaddr_aton(DNS_FALLBACK, &dnsserver)) {
+    dns_setserver(0, &dnsserver);
+    Serial.printf("[eth] DNS-fallback ingesteld op %s\n", DNS_FALLBACK);
+  } else {
+    Serial.printf("[eth] ongeldige DNS_FALLBACK: %s\n", DNS_FALLBACK);
+  }
+}
+#endif
 
 // Stel de lamp-GPIO in op de gewenste stand (active-HIGH).
 void setLamp(bool aan) {
@@ -230,8 +247,15 @@ void ethEvent(WiFiEvent_t event) {
       ethVerbonden = true;
       Serial.print("[eth] IP-adres: ");
       Serial.println(ETH.localIP());
+      Serial.print("[eth] gateway  : ");
+      Serial.println(ETH.gatewayIP());
+      Serial.print("[eth] DNS      : ");
+      Serial.println(ETH.dnsIP());
       Serial.printf("[eth] snelheid: %d Mbps, %s\n",
                     ETH.linkSpeed(), ETH.fullDuplex() ? "full duplex" : "half duplex");
+#ifdef DNS_FALLBACK
+      zetDnsFallback();
+#endif
       break;
 
     case ARDUINO_EVENT_ETH_DISCONNECTED:
@@ -307,11 +331,19 @@ void setup() {
             OA_PHY_TYPE, OA_CLK_MODE);
 #endif
 
-  // --- WebSocket-client starten ---
-  startWebSocket();
+  // De WebSocket-client starten we pas zodra Ethernet een IP heeft (zie loop).
+  // Eerder starten heeft geen zin: het opzoeken van de servernaam mislukt dan
+  // en je krijgt een stroom "DNS Failed"-meldingen.
+  Serial.println("[eth] wachten op netwerk (DHCP)...");
 }
 
 void loop() {
+  // Start de WebSocket-client zodra het netwerk klaar is (eenmalig).
+  if (ethVerbonden && !wsGestart) {
+    wsGestart = true;
+    startWebSocket();
+  }
+
   ws.loop();
 
   // Periodieke heartbeat versturen.

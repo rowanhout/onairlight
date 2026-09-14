@@ -120,3 +120,13 @@
 // #define OA_PHY_POWER 12
 // #define OA_PHY_MDC   23
 // #define OA_PHY_MDIO  18
+
+// ---------------------------------------------------------------------------
+// 8) GEVORDERD: DNS-fallback
+// ---------------------------------------------------------------------------
+// Krijg je in de seriele monitor wel een IP-adres, maar meldingen als
+//   hostByName(): DNS Failed for <jouw server>
+// dan levert je DHCP-server geen bruikbare DNS mee. Forceer er dan zelf een:
+//
+// #define DNS_FALLBACK "8.8.8.8"     // Google DNS
+// #define DNS_FALLBACK "1.1.1.1"     // Cloudflare DNS
