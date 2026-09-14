@@ -26,12 +26,9 @@
 #include <ETH.h>
 #include <WiFi.h>               // levert WiFi.onEvent + ARDUINO_EVENT_ETH_* events
 
-// Zet WS_DEBUG in config.h om de interne logging van de WebSocket-library aan
-// te zetten. Handig bij het uitzoeken van verbindings- of TLS-problemen; de
-// library print dan onder meer of het CA-certificaat wordt ingesteld.
-#ifdef WS_DEBUG
-  #define DEBUG_WEBSOCKETS(...) Serial.printf(__VA_ARGS__)
-#endif
+// Wil je de interne logging van de WebSocket-library zien? Bouw dan met de
+// omgeving poe2-debug (zie platformio.ini). Een #define hier werkt niet: de
+// library is een eigen vertaaleenheid en ziet macro's uit deze sketch niet.
 #include <WebSocketsClient.h>   // links2004/arduinoWebSockets  (>= 2.4.0)
 #include <ArduinoJson.h>        // bblanchon/ArduinoJson v7
 #include <time.h>
@@ -450,6 +447,67 @@ void synchroniseerTijd() {
 #endif
 
 // ===========================================================================
+// Netwerk-zelftest
+// ===========================================================================
+// Bij verbindingsproblemen meldt de WebSocket-library alleen "verbinding
+// verbroken" en verzwijgt ze de oorzaak. Deze test loopt de keten zelf langs en
+// scheidt de drie mogelijke oorzaken: DNS, een dichte poort, of een server die
+// wel luistert maar iets anders terugpraat dan onze app.
+static void netwerkZelftest() {
+  Serial.println("[test] ---- netwerk-zelftest ----");
+
+  // 1) Lost de naam op?
+  IPAddress ip;
+  unsigned long t0 = millis();
+  if (!WiFi.hostByName(SERVER_HOST, ip)) {
+    Serial.printf("[test] DNS  : MISLUKT voor %s\n", SERVER_HOST);
+    Serial.println("[test] -> zet DNS_FALLBACK in config.h op 1.1.1.1 of 8.8.8.8");
+    Serial.println("[test] ---- einde zelftest ----");
+    return;
+  }
+  Serial.printf("[test] DNS  : %s -> %s  (%lu ms)\n",
+                SERVER_HOST, ip.toString().c_str(), millis() - t0);
+
+  // 2) Komen we op de doelpoort binnen?
+  WiFiClient client;
+  t0 = millis();
+  if (!client.connect(ip, SERVER_PORT, 8000)) {
+    Serial.printf("[test] TCP  : poort %d ONBEREIKBAAR (%lu ms)\n",
+                  SERVER_PORT, millis() - t0);
+    Serial.println("[test] -> het netwerk of een firewall laat deze poort niet door");
+    Serial.println("[test] ---- einde zelftest ----");
+    return;
+  }
+  Serial.printf("[test] TCP  : poort %d open (%lu ms)\n", SERVER_PORT, millis() - t0);
+
+  // 3) Antwoordt daar ook echt onze app? Via de kale TCP-proxy komen we
+  //    rechtstreeks bij uvicorn uit, dus er hoort een HTTP-statusregel te
+  //    komen. Blijft het stil, dan luistert er iets anders.
+  client.print(String("GET /login HTTP/1.1\r\nHost: ") + SERVER_HOST +
+               "\r\nConnection: close\r\n\r\n");
+  String regel;
+  unsigned long start = millis();
+  while (millis() - start < 8000) {
+    while (client.available()) {
+      char c = (char)client.read();
+      if (c == '\r') continue;
+      if (c == '\n') { start = 0; break; }        // statusregel compleet
+      if (regel.length() < 120) regel += c;
+    }
+    if (start == 0) break;
+    if (!client.connected() && !client.available()) break;
+    delay(10);
+  }
+  client.stop();
+  if (regel.length()) {
+    Serial.printf("[test] HTTP : %s\n", regel.c_str());
+  } else {
+    Serial.println("[test] HTTP : geen antwoord -- er luistert iets anders dan de app");
+  }
+  Serial.println("[test] ---- einde zelftest ----");
+}
+
+// ===========================================================================
 // WebSocket-client starten
 // ===========================================================================
 void startWebSocket() {
@@ -554,6 +612,7 @@ void loop() {
 #if USE_TLS
     synchroniseerTijd();   // nodig om het servercertificaat te kunnen valideren
 #endif
+    netwerkZelftest();
     startWebSocket();
   }
 

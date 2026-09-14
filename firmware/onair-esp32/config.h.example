@@ -183,8 +183,15 @@
 // ---------------------------------------------------------------------------
 // 11) DIAGNOSE: logging van de WebSocket-library
 // ---------------------------------------------------------------------------
-// Haal dit uit commentaar om de interne meldingen van arduinoWebSockets te
-// zien (verbinden, TLS, headers). Handig bij verbindingsproblemen; zet het
-// daarna weer uit, want het maakt de seriele monitor erg spraakzaam.
+// Dit staat NIET hier, maar in platformio.ini: bouw met de omgeving poe2-debug
+// om de interne meldingen van arduinoWebSockets te zien (verbinden, headers,
+// TLS). Een #define in config.h heeft geen effect, want de library wordt als
+// aparte vertaaleenheid gecompileerd en ziet die macro niet.
 //
-// #define WS_DEBUG 1
+//   pio run -e poe2-debug -t upload && pio device monitor
+//
+// Zet het daarna weer terug naar 'pio run -t upload', want het maakt de
+// seriele monitor erg spraakzaam.
+//
+// De firmware doet bij elke start sowieso al een korte netwerk-zelftest
+// ([test] DNS / TCP / HTTP) die laat zien of de server bereikbaar is.

@@ -174,6 +174,29 @@ pio run -e wt32-eth01 -t upload    # WT32-ETH01
 pio device monitor                 # seriele monitor (115200 baud)
 ```
 
+## Verbinding uitzoeken
+
+Bij elke start doet de firmware een korte zelftest en print die het resultaat
+per stap, zodat je ziet wáár het strandt in plaats van alleen "verbroken":
+
+```
+[test] DNS  : altaria.proxy.rlwy.net -> 66.33.22.11  (24 ms)
+[test] TCP  : poort 35261 open (41 ms)
+[test] HTTP : HTTP/1.1 200 OK
+```
+
+- **DNS mislukt** -> je DHCP-server levert geen bruikbare DNS mee; zet
+  `DNS_FALLBACK` in `config.h`.
+- **TCP onbereikbaar** -> het netwerk of een firewall laat die poort niet door.
+- **HTTP geen antwoord** -> de poort staat open, maar er luistert iets anders
+  dan de app (bijvoorbeeld een filter-appliance).
+- **Alles OK maar de WebSocket verbindt niet** -> bouw met de debug-omgeving;
+  de library print dan zelf wat ze verstuurt en terugkrijgt:
+
+```sh
+pio run -e poe2-debug -t upload && pio device monitor
+```
+
 ## Flashen via Arduino IDE
 
 1. Voeg in **Bestand -> Voorkeuren -> Aanvullende Board Manager-URL's** toe:
