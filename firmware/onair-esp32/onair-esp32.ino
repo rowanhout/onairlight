@@ -21,11 +21,13 @@
 // ----------------------------------------------------------------------------
 
 #include "config.h"
+#include "certs.h"              // root-certificaten voor wss://
 
 #include <ETH.h>
 #include <WiFi.h>               // levert WiFi.onEvent + ARDUINO_EVENT_ETH_* events
 #include <WebSocketsClient.h>   // links2004/arduinoWebSockets  (>= 2.4.0)
 #include <ArduinoJson.h>        // bblanchon/ArduinoJson v7
+#include <time.h>
 
 // ===========================================================================
 // Board-afhankelijke Ethernet (RMII) configuratie
@@ -279,6 +281,38 @@ void ethEvent(WiFiEvent_t event) {
 }
 
 // ===========================================================================
+// Tijd ophalen via NTP
+// ===========================================================================
+// Een TLS-certificaat heeft een geldigheidsperiode. Zonder kloppende klok denkt
+// de ESP32 dat het 1970 is en keurt hij elk certificaat af. Daarom halen we de
+// tijd op voordat we verbinden.
+#if USE_TLS
+void synchroniseerTijd() {
+  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+  Serial.print("[tijd] NTP ophalen");
+  const time_t drempel = 1700000000;   // ergens in 2023; alles daarboven is echt
+  unsigned long start = millis();
+  time_t nu = time(nullptr);
+  while (nu < drempel && millis() - start < 15000) {
+    delay(500);
+    Serial.print(".");
+    nu = time(nullptr);
+  }
+  Serial.println();
+  if (nu < drempel) {
+    Serial.println("[tijd] LET OP: geen NTP-tijd; certificaatvalidatie zal falen.");
+    Serial.println("[tijd] Blokkeert je netwerk UDP-poort 123 (NTP)?");
+  } else {
+    struct tm tijd;
+    gmtime_r(&nu, &tijd);
+    Serial.printf("[tijd] %04d-%02d-%02d %02d:%02d:%02d UTC\n",
+                  tijd.tm_year + 1900, tijd.tm_mon + 1, tijd.tm_mday,
+                  tijd.tm_hour, tijd.tm_min, tijd.tm_sec);
+  }
+}
+#endif
+
+// ===========================================================================
 // WebSocket-client starten
 // ===========================================================================
 void startWebSocket() {
@@ -292,9 +326,11 @@ void startWebSocket() {
                 USE_TLS ? "wss" : "ws", SERVER_HOST, SERVER_PORT, pad.c_str());
 
 #if USE_TLS
-  // wss:// - versleuteld, maar certificaat wordt NIET gevalideerd (insecure).
-  // Vereist arduinoWebSockets >= 2.4.0.
-  ws.beginSSL(SERVER_HOST, SERVER_PORT, pad.c_str());
+  // wss:// - versleuteld EN het servercertificaat wordt gevalideerd tegen de
+  // roots in certs.h. We gebruiken bewust beginSslWithCA() en niet beginSSL():
+  // afhankelijk van de libraryversie zet beginSSL() de "insecure" modus niet,
+  // waardoor de handshake faalt met "start_ssl_client: -1".
+  ws.beginSslWithCA(SERVER_HOST, SERVER_PORT, pad.c_str(), ONAIR_ROOT_CAS);
 #else
   // ws:// - onversleuteld, simpel en robuust op een vertrouwd LAN.
   ws.begin(SERVER_HOST, SERVER_PORT, pad.c_str());
@@ -378,6 +414,9 @@ void loop() {
   // Start de WebSocket-client zodra het netwerk klaar is (eenmalig).
   if (ethVerbonden && !wsGestart) {
     wsGestart = true;
+#if USE_TLS
+    synchroniseerTijd();   // nodig om het servercertificaat te kunnen valideren
+#endif
     startWebSocket();
   }
 

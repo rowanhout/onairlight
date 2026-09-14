@@ -103,9 +103,16 @@ Stel in `config.h` minimaal in:
   LAN.
 - **wss (cloud / Railway):** server draait achter HTTPS. Zet `USE_TLS = true`,
   `SERVER_PORT = 443`.
-  **Let op:** bij wss wordt het server-certificaat **niet** gevalideerd
-  (insecure mode van arduinoWebSockets >= 2.4.0). De verbinding is versleuteld,
-  maar niet beschermd tegen man-in-the-middle.
+  Het servercertificaat wordt **gevalideerd** tegen de root-certificaten in
+  `certs.h` (Let's Encrypt ISRG Root X1/X2 + DigiCert Global Root G2). De
+  verbinding is dus versleuteld én beschermd tegen man-in-the-middle.
+  Omdat certificaatvalidatie een kloppende klok vereist, haalt de firmware
+  eerst de tijd op via NTP (UDP-poort 123 moet open staan).
+
+> Waarom `beginSslWithCA()` en niet `beginSSL()`? Afhankelijk van de versie van
+> arduinoWebSockets zet `beginSSL()` de "insecure" modus niet, waarna de
+> handshake faalt met `start_ssl_client: -1`. De CA-variant werkt op elke
+> versie én is veiliger.
 
 ## Aansluiten om te flashen
 
