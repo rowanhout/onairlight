@@ -201,3 +201,13 @@
 //
 // De firmware doet bij elke start sowieso al een korte netwerk-zelftest
 // ([test] DNS / TCP / HTTP) die laat zien of de server bereikbaar is.
+//
+// Blijkt daaruit dat de doelpoort dicht zit, dan kun je laten meten of TLS op
+// poort 443 wel bruikbaar is. Zet daarvoor:
+//
+// #define TLS_TEST 1
+//
+// LET OP: alleen tijdens het uitzoeken, nooit in een lamp die in gebruik is.
+// Op netwerken die TLS-verkeer opvangen en niet beantwoorden keert de
+// handshake niet terug en blijft de lamp in de test hangen -- de timeout geldt
+// voor het verbinden, niet voor het handshaken.

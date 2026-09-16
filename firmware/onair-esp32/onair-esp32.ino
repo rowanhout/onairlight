@@ -313,6 +313,16 @@ void ethEvent(WiFiEvent_t event) {
 // ===========================================================================
 // Tijd ophalen via NTP
 // ===========================================================================
+// Een gewone webserver op een standaardpoort, als ijkpunt. SERVER_HOST kan naar
+// een kale TCP-proxy wijzen, en daar draait geen webserver -- niet bruikbaar om
+// de tijd op te halen of om te meten of het bord uberhaupt naar buiten mag.
+#ifndef CONTROLE_HOST
+  #define CONTROLE_HOST "reclamp.madera.video"
+#endif
+#ifndef CONTROLE_PORT
+  #define CONTROLE_PORT 443
+#endif
+
 // Een TLS-certificaat heeft een geldigheidsperiode. Zonder kloppende klok denkt
 // de ESP32 dat het 1970 is en keurt hij elk certificaat af. Daarom halen we de
 // tijd op voordat we verbinden.
@@ -359,12 +369,15 @@ static bool tijdViaHttpDate() {
   // LET OP: WiFiClient::setTimeout() rekent op de ESP32 in SECONDEN.
   client.setTimeout(5);
 
-  Serial.printf("[tijd] verbinden met %s:80 ...\n", SERVER_HOST);
-  if (!client.connect(SERVER_HOST, 80, 5000)) {   // connect-timeout wel in ms
+  // Bewust CONTROLE_HOST en niet SERVER_HOST: wijst SERVER_HOST naar een kale
+  // TCP-proxy, dan draait daar geen webserver op poort 80 en is deze stap bij
+  // voorbaat kansloos.
+  Serial.printf("[tijd] verbinden met %s:80 ...\n", CONTROLE_HOST);
+  if (!client.connect(CONTROLE_HOST, 80, 5000)) {   // connect-timeout wel in ms
     Serial.println("[tijd] HTTP-verbinding mislukt (poort 80 dicht?)");
     return false;
   }
-  client.print(String("HEAD / HTTP/1.1\r\nHost: ") + SERVER_HOST +
+  client.print(String("HEAD / HTTP/1.1\r\nHost: ") + CONTROLE_HOST +
                "\r\nConnection: close\r\n\r\n");
 
   // Zelf de tijd bewaken in plaats van op de stream-timeout vertrouwen.
@@ -478,19 +491,20 @@ void synchroniseerTijd() {
 // dat alleen deze ene poort dichtzit -- en dat is precies het verschil tussen
 // "vraag de netwerkbeheerder om de poort open te zetten" en "dit bord komt er
 // hoe dan ook niet uit".
-#ifndef CONTROLE_HOST
-  #define CONTROLE_HOST "reclamp.madera.video"
-#endif
-#ifndef CONTROLE_PORT
-  #define CONTROLE_PORT 443
-#endif
-
 // Werkt TLS op poort 443 wel? Twee metingen naast elkaar, want alleen samen
 // zeggen ze iets:
 //   - zonder certificaatcontrole: lukt de TLS-handshake uberhaupt?
 //   - met onze root-certificaten:  is het certificaat ook van wie het hoort?
 // Verschil tussen die twee betekent dat er iets tussen zit dat het verkeer
 // openbreekt en met een eigen certificaat aan ons doorgeeft.
+//
+// ALLEEN op verzoek (TLS_TEST in config.h), en om een goede reden: blijft de
+// TLS-handshake halverwege steken, dan keert WiFiClientSecure niet terug -- de
+// timeout die we meegeven geldt voor het verbinden, niet voor het handshaken.
+// Op een netwerk dat TLS opvangt en laat doodbloeden zou de lamp dus blijven
+// hangen in zijn eigen zelftest en nooit meer aan zijn WebSocket toekomen.
+// Diagnose mag nooit in de weg lopen van de functie.
+#ifdef TLS_TEST
 static void tlsProefneming() {
   // Certificaatcontrole vergelijkt geldigheidsdata, dus de klok moet kloppen --
   // anders meten we onze eigen 1970 in plaats van het netwerk.
@@ -530,6 +544,7 @@ static void tlsProefneming() {
     Serial.println("[test] -> TLS komt helemaal niet tot stand op dit netwerk");
   }
 }
+#endif  // TLS_TEST
 
 static void controleMeting() {
   WiFiClient ref;
@@ -547,8 +562,13 @@ static void controleMeting() {
 
   Serial.println("[test] -> naar buiten mag wel, maar deze poort niet:");
   Serial.println("[test]    een firewall blokkeert uitgaand verkeer op hoge poorten");
+#ifdef TLS_TEST
   Serial.println("[test]    poort 443 staat wel open -- die route meten we nu:");
   tlsProefneming();
+#else
+  Serial.println("[test]    poort 443 staat wel open; zet TLS_TEST in config.h om");
+  Serial.println("[test]    te meten of die route bruikbaar is");
+#endif
 }
 
 static void netwerkZelftest() {
