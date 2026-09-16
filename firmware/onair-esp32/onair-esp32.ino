@@ -469,6 +469,35 @@ void synchroniseerTijd() {
 // verbroken" en verzwijgt ze de oorzaak. Deze test loopt de keten zelf langs en
 // scheidt de drie mogelijke oorzaken: DNS, een dichte poort, of een server die
 // wel luistert maar iets anders terugpraat dan onze app.
+// Referentiemeting, alleen nodig als de doelpoort onbereikbaar blijkt. Zonder
+// vergelijking weten we namelijk niet of dit bord uberhaupt naar buiten mag of
+// dat alleen deze ene poort dichtzit -- en dat is precies het verschil tussen
+// "vraag de netwerkbeheerder om de poort open te zetten" en "dit bord komt er
+// hoe dan ook niet uit".
+#ifndef CONTROLE_HOST
+  #define CONTROLE_HOST "reclamp.madera.video"
+#endif
+#ifndef CONTROLE_PORT
+  #define CONTROLE_PORT 443
+#endif
+
+static void controleMeting() {
+  WiFiClient ref;
+  unsigned long t0 = millis();
+  bool ok = ref.connect(CONTROLE_HOST, CONTROLE_PORT, 8000);
+  ref.stop();
+  Serial.printf("[test] ref  : %s:%d %s (%lu ms)\n",
+                CONTROLE_HOST, CONTROLE_PORT,
+                ok ? "open" : "ONBEREIKBAAR", millis() - t0);
+  if (ok) {
+    Serial.println("[test] -> naar buiten mag wel, maar deze poort niet:");
+    Serial.println("[test]    een firewall blokkeert uitgaand verkeer op hoge poorten");
+  } else {
+    Serial.println("[test] -> ook een gewone poort lukt niet; dit bord komt het");
+    Serial.println("[test]    netwerk niet uit (verkeerd VLAN, of alles geblokkeerd)");
+  }
+}
+
 static void netwerkZelftest() {
   Serial.println("[test] ---- netwerk-zelftest ----");
 
@@ -490,7 +519,7 @@ static void netwerkZelftest() {
   if (!client.connect(ip, SERVER_PORT, 8000)) {
     Serial.printf("[test] TCP  : poort %d ONBEREIKBAAR (%lu ms)\n",
                   SERVER_PORT, millis() - t0);
-    Serial.println("[test] -> het netwerk of een firewall laat deze poort niet door");
+    controleMeting();
     Serial.println("[test] ---- einde zelftest ----");
     return;
   }
