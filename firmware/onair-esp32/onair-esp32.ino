@@ -25,6 +25,7 @@
 
 #include <ETH.h>
 #include <WiFi.h>               // levert WiFi.onEvent + ARDUINO_EVENT_ETH_* events
+#include <WiFiClientSecure.h>   // voor de TLS-meting in de zelftest
 
 // Wil je de interne logging van de WebSocket-library zien? Bouw dan met de
 // omgeving poe2-debug (zie platformio.ini). Een #define hier werkt niet: de
@@ -315,7 +316,11 @@ void ethEvent(WiFiEvent_t event) {
 // Een TLS-certificaat heeft een geldigheidsperiode. Zonder kloppende klok denkt
 // de ESP32 dat het 1970 is en keurt hij elk certificaat af. Daarom halen we de
 // tijd op voordat we verbinden.
-#if USE_TLS
+//
+// Dit blok wordt altijd meegecompileerd, ook bij USE_TLS = false: de zelftest
+// gebruikt het om te kunnen meten of TLS op dit netwerk werkt. Bij ws:// wordt
+// het tijdens normaal gebruik simpelweg niet aangeroepen.
+//
 // Alles na deze datum beschouwen we als een echte klok (en niet 1970).
 static const time_t TIJD_DREMPEL = 1700000000;
 
@@ -460,7 +465,6 @@ void synchroniseerTijd() {
 
   Serial.println("[tijd] LET OP: geen tijd gevonden; certificaatvalidatie faalt.");
 }
-#endif
 
 // ===========================================================================
 // Netwerk-zelftest
@@ -481,6 +485,52 @@ void synchroniseerTijd() {
   #define CONTROLE_PORT 443
 #endif
 
+// Werkt TLS op poort 443 wel? Twee metingen naast elkaar, want alleen samen
+// zeggen ze iets:
+//   - zonder certificaatcontrole: lukt de TLS-handshake uberhaupt?
+//   - met onze root-certificaten:  is het certificaat ook van wie het hoort?
+// Verschil tussen die twee betekent dat er iets tussen zit dat het verkeer
+// openbreekt en met een eigen certificaat aan ons doorgeeft.
+static void tlsProefneming() {
+  // Certificaatcontrole vergelijkt geldigheidsdata, dus de klok moet kloppen --
+  // anders meten we onze eigen 1970 in plaats van het netwerk.
+  if (!tijdIsGeldig()) {
+    synchroniseerTijd();
+  }
+
+  bool zonder = false;
+  {
+    WiFiClientSecure c;
+    c.setInsecure();
+    unsigned long t0 = millis();
+    zonder = c.connect(CONTROLE_HOST, 443, 8000);
+    c.stop();
+    Serial.printf("[test] tls  : zonder certificaatcontrole %s (%lu ms)\n",
+                  zonder ? "OK" : "MISLUKT", millis() - t0);
+  }
+
+  bool met = false;
+  {
+    WiFiClientSecure c;
+    c.setCACert(ONAIR_ROOT_CAS);
+    unsigned long t0 = millis();
+    met = c.connect(CONTROLE_HOST, 443, 8000);
+    c.stop();
+    Serial.printf("[test] tls  : met certificaatcontrole    %s (%lu ms)\n",
+                  met ? "OK" : "MISLUKT", millis() - t0);
+  }
+
+  if (met) {
+    Serial.println("[test] -> TLS werkt volledig. Zet USE_TLS op true, SERVER_HOST op");
+    Serial.printf ("[test]    %s en SERVER_PORT op 443.\n", CONTROLE_HOST);
+  } else if (zonder) {
+    Serial.println("[test] -> versleutelen lukt, maar het certificaat is niet van ons:");
+    Serial.println("[test]    er zit een apparaat tussen dat het verkeer openbreekt");
+  } else {
+    Serial.println("[test] -> TLS komt helemaal niet tot stand op dit netwerk");
+  }
+}
+
 static void controleMeting() {
   WiFiClient ref;
   unsigned long t0 = millis();
@@ -489,13 +539,16 @@ static void controleMeting() {
   Serial.printf("[test] ref  : %s:%d %s (%lu ms)\n",
                 CONTROLE_HOST, CONTROLE_PORT,
                 ok ? "open" : "ONBEREIKBAAR", millis() - t0);
-  if (ok) {
-    Serial.println("[test] -> naar buiten mag wel, maar deze poort niet:");
-    Serial.println("[test]    een firewall blokkeert uitgaand verkeer op hoge poorten");
-  } else {
+  if (!ok) {
     Serial.println("[test] -> ook een gewone poort lukt niet; dit bord komt het");
     Serial.println("[test]    netwerk niet uit (verkeerd VLAN, of alles geblokkeerd)");
+    return;
   }
+
+  Serial.println("[test] -> naar buiten mag wel, maar deze poort niet:");
+  Serial.println("[test]    een firewall blokkeert uitgaand verkeer op hoge poorten");
+  Serial.println("[test]    poort 443 staat wel open -- die route meten we nu:");
+  tlsProefneming();
 }
 
 static void netwerkZelftest() {
