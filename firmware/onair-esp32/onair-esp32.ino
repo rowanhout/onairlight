@@ -598,31 +598,83 @@ static void netwerkZelftest() {
 }
 
 // ===========================================================================
-// WebSocket-client starten
+// WebSocket-client starten, met terugvalserver
 // ===========================================================================
+// Een on-air lamp die alleen werkt als het internet het doet, is een on-air
+// lamp die tijdens een uitzending kan uitvallen. Daarom kent de firmware twee
+// bestemmingen: een primaire (meestal een server op het eigen LAN, die geen
+// internet, DNS of certificaten nodig heeft) en een reserve (de cloud). Lukt de
+// ene FAILOVER_MS lang niet, dan gaat hij naar de andere, en zo door.
+//
+// Is er maar een server geconfigureerd, dan blijft het gedrag precies zoals het
+// was: eindeloos opnieuw proberen op die ene.
+
+struct Bestemming {
+  const char * host;
+  uint16_t     poort;
+  bool         tls;
+};
+
+static const Bestemming BESTEMMINGEN[] = {
+  { SERVER_HOST, SERVER_PORT, USE_TLS },
+#ifdef SERVER2_HOST
+  { SERVER2_HOST, SERVER2_PORT, SERVER2_TLS },
+#endif
+};
+static const uint8_t AANTAL_BESTEMMINGEN =
+    sizeof(BESTEMMINGEN) / sizeof(BESTEMMINGEN[0]);
+
+// Hoe lang we een bestemming de kans geven voordat we de andere proberen.
+#ifndef FAILOVER_MS
+  #define FAILOVER_MS 30000
+#endif
+
+static uint8_t       actieveBestemming = 0;
+static unsigned long pogingGestart     = 0;
+
 void startWebSocket() {
+  const Bestemming & b = BESTEMMINGEN[actieveBestemming];
+
   // Bouw het pad inclusief URL-geencodeerde query-parameters.
   String pad = "/ws/device";
   pad += "?id=" + urlEncode(LAMP_ID);
   pad += "&naam=" + urlEncode(LAMP_NAAM);
   pad += "&ruimte=" + urlEncode(LAMP_RUIMTE);
 
-  Serial.printf("[ws] verbinden met %s://%s:%d%s\n",
-                USE_TLS ? "wss" : "ws", SERVER_HOST, SERVER_PORT, pad.c_str());
+  Serial.printf("[ws] verbinden met %s://%s:%u%s\n",
+                b.tls ? "wss" : "ws", b.host, b.poort, pad.c_str());
 
-#if USE_TLS
-  // wss:// - versleuteld EN het servercertificaat wordt gevalideerd tegen de
-  // roots in certs.h. We gebruiken bewust beginSslWithCA() en niet beginSSL():
-  // afhankelijk van de libraryversie zet beginSSL() de "insecure" modus niet,
-  // waardoor de handshake faalt met "start_ssl_client: -1".
-  ws.beginSslWithCA(SERVER_HOST, SERVER_PORT, pad.c_str(), ONAIR_ROOT_CAS);
-#else
-  // ws:// - onversleuteld, simpel en robuust op een vertrouwd LAN.
-  ws.begin(SERVER_HOST, SERVER_PORT, pad.c_str());
-#endif
+  if (b.tls) {
+    // wss:// - versleuteld EN het servercertificaat wordt gevalideerd tegen de
+    // roots in certs.h. We gebruiken bewust beginSslWithCA() en niet beginSSL():
+    // afhankelijk van de libraryversie zet beginSSL() de "insecure" modus niet,
+    // waardoor de handshake faalt met "start_ssl_client: -1".
+    ws.beginSslWithCA(b.host, b.poort, pad.c_str(), ONAIR_ROOT_CAS);
+  } else {
+    // ws:// - onversleuteld, simpel en robuust op een vertrouwd LAN.
+    ws.begin(b.host, b.poort, pad.c_str());
+  }
 
   ws.onEvent(wsEvent);
   ws.setReconnectInterval(3000);   // elke 3s opnieuw proberen bij verbreken
+  pogingGestart = millis();
+}
+
+// Blijft de huidige bestemming te lang stil, stap dan over op de volgende.
+static void bewaakVerbinding() {
+  if (AANTAL_BESTEMMINGEN < 2) return;   // niets om naar uit te wijken
+  if (ws.isConnected()) {
+    pogingGestart = millis();            // verbonden: de klok loopt niet
+    return;
+  }
+  if (millis() - pogingGestart < FAILOVER_MS) return;
+
+  actieveBestemming = (actieveBestemming + 1) % AANTAL_BESTEMMINGEN;
+  Serial.printf("[ws] %lu s geen verbinding -- nu bestemming %u van %u\n",
+                (unsigned long)(FAILOVER_MS / 1000),
+                actieveBestemming + 1, AANTAL_BESTEMMINGEN);
+  ws.disconnect();
+  startWebSocket();
 }
 
 // ===========================================================================
@@ -704,9 +756,14 @@ void loop() {
   // denkt dat hij aan is.
   if (ethVerbonden && !wsGestart) {
     wsGestart = true;
-#if USE_TLS
-    synchroniseerTijd();   // nodig om het servercertificaat te kunnen valideren
-#endif
+    // Alleen tijd ophalen als minstens een van de bestemmingen TLS gebruikt.
+    // Bij een lamp die op een lokale server draait is dat niet zo, en dan
+    // hoeft hij ook niet op een NTP-timeout te wachten.
+    bool tlsNodig = false;
+    for (uint8_t i = 0; i < AANTAL_BESTEMMINGEN; i++) {
+      if (BESTEMMINGEN[i].tls) tlsNodig = true;
+    }
+    if (tlsNodig) synchroniseerTijd();
     startWebSocket();
 #ifdef NET_TEST
     netwerkZelftest();
@@ -714,6 +771,7 @@ void loop() {
   }
 
   ws.loop();
+  if (wsGestart) bewaakVerbinding();
 
   // Periodieke heartbeat versturen.
   unsigned long nu = millis();

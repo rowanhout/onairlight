@@ -57,9 +57,28 @@
 // (melding "start_ssl_client: -1"), gebruik dan de TCP-proxy hierboven: dat is
 // dezelfde server, alleen zonder de TLS-laag.
 //
-#define SERVER_HOST "altaria.proxy.rlwy.net"  // hostnaam of IP van de server
-#define SERVER_PORT 35261                     // TCP-proxy van Railway
-#define USE_TLS     false                     // true = wss://, false = ws://
+#define SERVER_HOST "192.168.1.50"   // hostnaam of IP van de server
+#define SERVER_PORT 8080             // 443 voor wss/cloud, 8080 voor ws/lokaal
+#define USE_TLS     false            // true = wss:// (cloud), false = ws:// (LAN)
+
+// ---------------------------------------------------------------------------
+// 2b) RESERVESERVER (optioneel, maar aan te raden)
+// ---------------------------------------------------------------------------
+// Een on-air lamp die alleen werkt als het internet het doet, kan tijdens een
+// uitzending uitvallen. Geef daarom hierboven een server op het EIGEN netwerk
+// op (geen internet, DNS of certificaten nodig -- dus niets dat kapot kan) en
+// hieronder de cloud als reserve.
+//
+// Lukt de een FAILOVER_MS lang niet, dan probeert de lamp de ander, en zo door.
+// Laat je dit blok uitgecommentarieerd, dan blijft de lamp eindeloos op de
+// server hierboven proberen -- precies zoals voorheen.
+//
+// #define SERVER2_HOST "web-production-a09cb.up.railway.app"
+// #define SERVER2_PORT 443
+// #define SERVER2_TLS  true
+//
+// Hoe lang een bestemming de kans krijgt voordat de andere aan de beurt is:
+// #define FAILOVER_MS 30000
 
 // ---------------------------------------------------------------------------
 // 3) IDENTITEIT VAN DEZE LAMP

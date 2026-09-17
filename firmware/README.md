@@ -99,7 +99,28 @@ Stel in `config.h` minimaal in:
 
 ## Hoe de lamp met de server verbindt
 
-Er zijn drie manieren; kies er één in `config.h`.
+Er zijn drie manieren; kies er één in `config.h`. Je kunt er ook **twee**
+opgeven: een primaire en een reserve.
+
+### Aanbevolen opzet: lokaal primair, cloud als reserve
+
+Een on-air lamp die alleen werkt als het internet het doet, kan tijdens een
+uitzending uitvallen — en op een netwerk dat je niet zelf beheert, kan hij
+helemaal nooit gaan werken. Zet daarom de server op het eigen netwerk voorop:
+
+```c
+#define SERVER_HOST "192.168.1.50"    // server op het eigen LAN
+#define SERVER_PORT 8080
+#define USE_TLS     false
+
+#define SERVER2_HOST "web-production-a09cb.up.railway.app"   // reserve
+#define SERVER2_PORT 443
+#define SERVER2_TLS  true
+```
+
+Lukt de primaire 30 seconden niet, dan probeert de lamp de reserve, en zo door.
+De lokale route heeft geen internet, geen DNS, geen certificaten en geen
+kloppende klok nodig — er is dus vrijwel niets dat kapot kan.
 
 ### 1. Cloud via de Railway TCP-proxy (in gebruik)
 
