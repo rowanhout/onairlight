@@ -26,6 +26,7 @@
 #include <ETH.h>
 #include <WiFi.h>               // levert WiFi.onEvent + ARDUINO_EVENT_ETH_* events
 #include <WiFiClientSecure.h>   // voor de TLS-meting in de zelftest
+#include <esp_heap_caps.h>      // om het vrije interne geheugen te kunnen meten
 
 // Wil je de interne logging van de WebSocket-library zien? Bouw dan met de
 // omgeving poe2-debug (zie platformio.ini). Een #define hier werkt niet: de
@@ -549,6 +550,58 @@ static bool meetTls(const char * host, uint16_t poort, bool metControle) {
   return ok;
 }
 
+// Haal een pagina van een paar kilobyte op over gewone HTTP en tel hoeveel
+// bytes er daadwerkelijk binnenkomen.
+//
+// Dit is de meting die "het netwerk laat geen TLS door" onderscheidt van "dit
+// bord kan geen grote hoeveelheid data achter elkaar ontvangen". Een TCP-
+// verbinding en een DNS-lookup zijn allebei een enkel klein pakketje; de
+// eerste keer dat de ESP32 een reeks volle frames op rij moet verwerken is bij
+// de certificaatketen in de TLS-handshake. Stokt deze HTTP-download op
+// vergelijkbare grootte, dan zit het probleem in het ontvangstpad van de
+// Ethernet-controller en niet in TLS.
+static void meetHttpDownload(const char * host, uint16_t poort, const char * pad) {
+  WiFiClient c;
+  unsigned long t0 = millis();
+  if (!c.connect(host, poort, 6000)) {
+    Serial.printf("[test] http %s:%u -> verbinden mislukt\n", host, poort);
+    return;
+  }
+  c.printf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n"
+           "User-Agent: onair-esp32\r\n\r\n", pad, host);
+
+  size_t bytes = 0;
+  String statusregel;
+  bool statusKlaar = false;
+  unsigned long laatsteByte = millis();
+  uint8_t buf[512];
+
+  // Stoppen zodra er 5 s lang niets meer komt, of na 20 s in totaal.
+  while (millis() - t0 < 20000 && millis() - laatsteByte < 5000) {
+    int n = c.available();
+    if (n <= 0) { delay(5); continue; }
+    int gelezen = c.read(buf, n > (int)sizeof(buf) ? (int)sizeof(buf) : n);
+    if (gelezen <= 0) { delay(5); continue; }
+    laatsteByte = millis();
+    if (!statusKlaar) {
+      for (int i = 0; i < gelezen && !statusKlaar; i++) {
+        char ch = (char)buf[i];
+        if (ch == '\n') statusKlaar = true;
+        else if (ch != '\r' && statusregel.length() < 60) statusregel += ch;
+      }
+    }
+    bytes += gelezen;
+  }
+  bool netjesAf = !c.connected();
+  c.stop();
+
+  Serial.printf("[test] http %s:%u%s -> %u bytes in %lu ms, %s [%s]\n",
+                host, poort, pad, (unsigned)bytes, millis() - t0,
+                netjesAf ? "verbinding netjes afgesloten"
+                         : "STOKTE (geen data meer, verbinding nog open)",
+                statusregel.c_str());
+}
+
 // --- de zelftest ----------------------------------------------------------
 //
 // Doel: in een oogopslag zien welke van de drie lagen faalt (naam, poort,
@@ -582,6 +635,22 @@ static void netwerkZelftest() {
   // geblokkeerd zijn, faalt deze terwijl 443 hierboven lukte.
   meetTcp("1.1.1.1, hoge poort", dns1, 8443);
 
+  Serial.println("[test] --- grote HTTP-download (zonder TLS) ---");
+  // De inlogpagina van onze eigen app, in platte tekst via de Railway
+  // TCP-proxy: enkele kilobytes, precies de orde van grootte van een
+  // certificaatketen. Komt dit compleet binnen, dan kan het bord prima een
+  // burst aan en ligt het TLS-probleem ergens anders.
+  meetHttpDownload("altaria.proxy.rlwy.net", 35261, "/login");
+
+  Serial.println("[test] --- geheugen voor de TLS-handshake ---");
+  // mbedTLS alloceert uitsluitend in INTERN geheugen (PSRAM telt niet mee) en
+  // heeft voor een handshake tientallen kilobytes nodig, in een aaneengesloten
+  // blok. Is het grootste vrije blok daarvoor te klein, dan faalt de handshake
+  // zonder dat er iets mis is met het netwerk.
+  Serial.printf("[test] heap intern vrij: %u bytes, grootste blok: %u bytes\n",
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+
   Serial.println("[test] --- TLS-handshakes (10 s per poging) ---");
   // Zonder certificaatcontrole eerst: die meet puur of de handshake zelf
   // doorkomt. Lukt dat wel en de variant met certificaat niet, dan is het een
@@ -593,8 +662,14 @@ static void netwerkZelftest() {
   meetTls("one.one.one.one", 443, false);
 
   Serial.println("[test] ================ einde zelftest =================");
-  Serial.println("[test] lees dit zo: faalt ALLES bij tls maar lukt tcp overal,");
-  Serial.println("[test] dan onderschept iets op dit netwerk versleuteld verkeer.");
+  Serial.println("[test] lezen:");
+  Serial.println("[test]  tcp overal open + tls overal mislukt -> ligt aan dit bord,");
+  Serial.println("[test]    niet aan het netwerk (twee netwerken, zelfde uitkomst).");
+  Serial.println("[test]  http-download STOKTE -> het ontvangstpad van de Ethernet-");
+  Serial.println("[test]    controller verliest data bij een burst; TLS is dan het");
+  Serial.println("[test]    slachtoffer, niet de dader.");
+  Serial.println("[test]  grootste vrije blok onder ~40 KB -> te weinig aaneengesloten");
+  Serial.println("[test]    intern geheugen voor een handshake.");
 }
 
 // ===========================================================================
