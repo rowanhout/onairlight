@@ -64,6 +64,36 @@ Standaard lamp-GPIO per bord:
 
 > Neem je lamp-GPIO nooit uit de Ethernet-pinnen.
 
+### ⚠ Zet de switchpoort op 10 Mbps full duplex
+
+Op 100 Mbit haalt dit bord het niet: het RMII-signaal is niet schoon genoeg,
+en frames waarin de hardware-checksumcontrole een fout ziet worden geruisloos
+weggegooid. Kleine pakketjes overleven dat (DNS, NTP, het opzetten van een
+TCP-verbinding), volle frames niet.
+
+Het gevolg is bijzonder misleidend: de lamp krijgt netjes een IP-adres, kan
+namen opzoeken en verbindingen opzetten — maar alles wat een paar volle frames
+nodig heeft komt nooit aan. De TLS-handshake is daarvan het eerste slachtoffer,
+want daarin stuurt de server zijn certificaatketen van enkele kilobytes. Je ziet
+dan `start_ssl_client: -1` en gaat certificaten, poorten en firewalls
+onderzoeken, terwijl het probleem in de fysieke laag zit.
+
+Symptomen die allemaal dezelfde oorzaak hebben:
+
+- `start_ssl_client: -1` of een TLS-handshake die niets terugkrijgt
+- een HTTP-download die op **0 bytes** blijft staan terwijl het verzoek
+  aantoonbaar wél bij de server aankwam
+- kleine antwoorden (een 301 van de router) komen wél door
+- af en toe een TCP-verbinding die ruim een seconde duurt (hertransmissie)
+
+Diagnose in één meting: laat het bord een pagina ophalen van een machine op
+hetzelfde subnet. Komt die niet binnen terwijl de server het verzoek wél zag,
+dan is dit het.
+
+Zet `#define VEREIS_10MBIT 1` in `config.h` zodat de firmware luid waarschuwt
+als de link toch op 100 Mbit staat. Voor deze toepassing kost 10 Mbit niets: de
+lamp stuurt een paar JSON-berichtjes per uur.
+
 ### Specifiek voor de Olimex ESP32-POE2
 
 Dit bord gebruikt een **WROVER**-module. Die claimt GPIO16/17 voor PSRAM,
@@ -122,28 +152,7 @@ Lukt de primaire 30 seconden niet, dan probeert de lamp de reserve, en zo door.
 De lokale route heeft geen internet, geen DNS, geen certificaten en geen
 kloppende klok nodig — er is dus vrijwel niets dat kapot kan.
 
-### 1. Cloud via de Railway TCP-proxy (in gebruik)
-
-Railway biedt dezelfde app naast HTTPS ook aan op een kale TCP-poort. Daar zit
-geen TLS voor, dus de ESP32 praat gewoon `ws://`: geen certificaten, geen
-klok-synchronisatie, geen mbedTLS.
-
-```c
-#define SERVER_HOST "altaria.proxy.rlwy.net"
-#define SERVER_PORT 35261
-#define USE_TLS     false
-```
-
-Het verkeer over die poort is **niet versleuteld**. Wat er overheen gaat is
-alleen de aan/uit-stand van een lamp plus de lamp-id, dus dat is hier
-acceptabel; zet er geen gevoelige gegevens op. De web-app zelf blijft gewoon
-via HTTPS op `reclamp.madera.video` draaien.
-
-> De TCP-proxy wijst naar poort 8080 in de container — dezelfde poort waarop
-> uvicorn luistert. Maakt Railway ooit een nieuwe proxy aan, dan verandert de
-> poort en moet `SERVER_PORT` mee.
-
-### 2. Cloud via HTTPS (wss)
+### 1. Cloud via HTTPS (wss)
 
 ```c
 #define SERVER_HOST "reclamp.madera.video"
@@ -162,10 +171,13 @@ de bouwdatum van de firmware.
 > handshake faalt met `start_ssl_client: -1`. De CA-variant werkt op elke
 > versie én is veiliger.
 >
-> Faalt de handshake op jouw netwerk alsnog met `start_ssl_client: -1` (sommige
-> netwerken breken TLS open of blokkeren het), gebruik dan optie 1.
+> Faalt de handshake met `start_ssl_client: -1`, ga dan **niet** meteen
+> certificaten of firewalls onderzoeken. Controleer eerst of de switchpoort op
+> **10 Mbps full duplex** staat — zie de waarschuwing hierboven. Dat is in de
+> praktijk vrijwel altijd de oorzaak: de certificaatketen is het eerste dat een
+> paar volle frames nodig heeft, en die komen op 100 Mbit niet aan.
 
-### 3. Lokaal op het LAN
+### 2. Lokaal op het LAN
 
 ```c
 #define SERVER_HOST "192.168.1.50"

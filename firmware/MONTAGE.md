@@ -143,7 +143,27 @@ Resultaat: **GPIO4 HIGH = Control gesloten = lamp AAN (ON AIR)**; LOW = uit.
 2. Voer de **ene UTP-kabel** de behuizing in via een trekontlasting.
 3. Sluit het deksel; controleer dat niets klemt of kortsluit.
 4. Op locatie: UTP naar de **PoE-switch/injector (802.3at)**.
-5. Eindcontrole: lamp verschijnt online in de web-app en schakelt correct.
+5. **Zet de switchpoort op 10 Mbps full duplex** — zie de waarschuwing hieronder.
+6. Eindcontrole: lamp verschijnt online in de web-app en schakelt correct.
+
+> ### ⚠ De switchpoort moet op 10 Mbps full duplex
+>
+> Niet op Auto. Op 100 Mbit is het Ethernet-signaal van dit bord niet schoon
+> genoeg: frames met een bitfout worden door de hardware geruisloos weggegooid.
+> Kleine pakketjes komen wel door, dus de lamp krijgt netjes een IP-adres en
+> alles lijkt in orde — maar alles wat een volle frame nodig heeft (de
+> beveiligde verbinding met de server) komt nooit aan. **Zonder enige
+> foutmelding, nergens.**
+>
+> De lamp doet het dan simpelweg niet, en er is niets dat verklaart waarom.
+> Deze ene instelling heeft ons dagen gekost om te vinden.
+>
+> In UniFi: **Ports** → de betreffende poort → **Link Speed** → `10 Mbps FDX`.
+> Bij andere merken heet dit meestal *Port Speed* of *Duplex/Speed*.
+>
+> Verhuist de lamp ooit naar een andere poort, dan moet die instelling mee.
+> Zet `#define VEREIS_10MBIT 1` in `config.h`, dan waarschuwt de firmware er
+> luid over in de seriële monitor zodra de link tóch op 100 Mbit staat.
 
 ---
 
@@ -157,9 +177,14 @@ Resultaat: **GPIO4 HIGH = Control gesloten = lamp AAN (ON AIR)**; LOW = uit.
 - [ ] 220 Ω gate-weerstand + 10 kΩ pull-down aanwezig.
 - [ ] Gemeenschappelijke massa gecontroleerd.
 - [ ] Lamp uit bij opstart; schakelt via web-app/afstandsbediening.
+- [ ] **Switchpoort staat op 10 Mbps full duplex** (niet op Auto).
 
 ## 9. Veelvoorkomende fouten
 
+- **Lamp krijgt wel een IP-adres maar verbindt nooit met de server:** vrijwel
+  altijd de linksnelheid. Zet de switchpoort op **10 Mbps full duplex**. Dit
+  ziet er uit als een certificaat-, poort- of firewallprobleem en is dat niet;
+  begin hier voordat je iets anders onderzoekt.
 - **Lamp doet niets:** Control-klemmen verwisseld of MOSFET Source/Drain
   omgedraaid; of geen gemeenschappelijke massa.
 - **WT32-ETH01 start niet / rookt:** buck stond niet op 5V — altijd meten.

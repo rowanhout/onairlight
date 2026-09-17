@@ -296,6 +296,25 @@ void ethEvent(WiFiEvent_t event) {
       Serial.println(ETH.dnsIP());
       Serial.printf("[eth] snelheid: %d Mbps, %s\n",
                     ETH.linkSpeed(), ETH.fullDuplex() ? "full duplex" : "half duplex");
+#ifdef VEREIS_10MBIT
+      // Deze installatie is bekend als onbetrouwbaar op 100 Mbit: het
+      // RMII-signaal is dan niet schoon genoeg en volle frames sneuvelen op de
+      // checksumcontrole. Kleine pakketjes komen wel door, dus alles lijkt te
+      // werken tot er echte data moet komen -- een TLS-handshake, een pagina --
+      // en dan gebeurt er niets, zonder enige foutmelding.
+      //
+      // Daarom hier luidruchtig, en niet stilletjes in een logregel: dit kost
+      // anders opnieuw dagen zoeken.
+      if (ETH.linkSpeed() != 10) {
+        Serial.println("[eth] ****************************************************");
+        Serial.println("[eth] LET OP: de link staat NIET op 10 Mbit.");
+        Serial.println("[eth] Deze lamp werkt alleen betrouwbaar op 10 Mbps FDX.");
+        Serial.println("[eth] Zet de switchpoort terug op 10 Mbps full duplex,");
+        Serial.println("[eth] anders komen grote pakketten niet aan en doet de");
+        Serial.println("[eth] lamp het niet -- zonder zichtbare fout.");
+        Serial.println("[eth] ****************************************************");
+      }
+#endif
 #ifdef DNS_FALLBACK
       zetDnsFallback();
 #endif

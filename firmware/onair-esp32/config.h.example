@@ -32,30 +32,28 @@
 // ---------------------------------------------------------------------------
 // De centrale FastAPI-server waarmee de lamp als WebSocket-CLIENT verbindt.
 //
-//  CLOUD via de Railway TCP-PROXY (aanbevolen, en wat we nu gebruiken):
-//                   Railway kan de app naast HTTPS ook op een kale TCP-poort
-//                   aanbieden. Daar zit geen TLS voor, dus de ESP32 praat
-//                   gewoon ws:// -- geen certificaten, geen klok, geen gedoe.
-//                       SERVER_HOST = "altaria.proxy.rlwy.net"
-//                       SERVER_PORT = 35261
-//                       USE_TLS     = false       // -> ws://
-//
-//  CLOUD via HTTPS: dezelfde server, maar via het normale webadres. Dan is TLS
-//                   verplicht:
+//  CLOUD via HTTPS (aanbevolen): de gewone route over poort 443, versleuteld
+//                   en met een gevalideerd certificaat.
 //                       SERVER_HOST = "reclamp.madera.video"
 //                       SERVER_PORT = 443
 //                       USE_TLS     = true        // -> wss://
 //
-//  LOKAAL (LAN):    de server draait op je eigen netwerk zonder TLS:
+//  LOKAAL (LAN):    de server draait op je eigen netwerk zonder TLS. Geen
+//                   internet, geen DNS, geen certificaten en geen klok nodig --
+//                   de robuustste route die er is, zie 2b.
 //                       SERVER_HOST = "192.168.1.50"
 //                       SERVER_PORT = 8080
 //                       USE_TLS     = false       // -> ws://
 //
-// Bij wss (USE_TLS = true) wordt het servercertificaat WEL gevalideerd, tegen
-// de root-certificaten in certs.h. Dat vereist een kloppende klok; de firmware
-// haalt die eerst op (zie punt 9). Werkt de TLS-handshake op jouw netwerk niet
-// (melding "start_ssl_client: -1"), gebruik dan de TCP-proxy hierboven: dat is
-// dezelfde server, alleen zonder de TLS-laag.
+// Bij wss (USE_TLS = true) wordt het servercertificaat gevalideerd tegen de
+// root-certificaten in certs.h.
+//
+// LET OP bij "start_ssl_client: -1" of een handshake die niets teruggeeft:
+// dat is meestal GEEN certificaat- of netwerkprobleem. Op dit bord bleek het
+// de linksnelheid te zijn -- zie 4b. Op 100 Mbit sneuvelen volle frames, en de
+// certificaatketen van de server is nu juist het eerste dat er een paar nodig
+// heeft. Controleer dus eerst of de link op 10 Mbps staat voordat je aan
+// certificaten, poorten of firewalls gaat sleutelen.
 //
 #define SERVER_HOST "192.168.1.50"   // hostnaam of IP van de server
 #define SERVER_PORT 8080             // 443 voor wss/cloud, 8080 voor ws/lokaal
@@ -116,6 +114,25 @@
 // LET OP: GPIO 20 bestaat NIET op dit bord (de WROVER-module heeft die pin niet).
 //
 #define LAMP_PIN -1
+
+// ---------------------------------------------------------------------------
+// 4b) LINKSNELHEID: 10 Mbit afdwingen
+// ---------------------------------------------------------------------------
+// Sommige exemplaren van de ESP32-POE2 halen 100 Mbit niet betrouwbaar: het
+// RMII-signaal is dan niet schoon genoeg en frames met een bitfout worden door
+// de hardware-checksumcontrole geruisloos weggegooid. Kleine pakketjes (DNS,
+// NTP, het opzetten van een verbinding) komen wel door, dus het LIJKT te
+// werken -- maar alles wat een volle frame nodig heeft (een TLS-handshake, een
+// webpagina) komt nooit aan, zonder ook maar een foutmelding.
+//
+// De oplossing is de switchpoort op 10 Mbps full duplex zetten. Voor deze
+// toepassing kost dat niets: een lamp stuurt een paar berichtjes per uur.
+//
+// Zet hieronder de bewaking aan. De firmware waarschuwt dan luid in de seriele
+// monitor zodra de link toch op 100 Mbit staat -- bijvoorbeeld nadat iemand de
+// kabel in een andere poort heeft gestoken.
+//
+// #define VEREIS_10MBIT 1
 
 // ---------------------------------------------------------------------------
 // 5) HEARTBEAT
