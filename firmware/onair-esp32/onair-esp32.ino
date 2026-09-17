@@ -483,146 +483,118 @@ void synchroniseerTijd() {
 // Netwerk-zelftest
 // ===========================================================================
 // Bij verbindingsproblemen meldt de WebSocket-library alleen "verbinding
-// verbroken" en verzwijgt ze de oorzaak. Deze test loopt de keten zelf langs en
-// scheidt de drie mogelijke oorzaken: DNS, een dichte poort, of een server die
-// wel luistert maar iets anders terugpraat dan onze app.
-// Referentiemeting, alleen nodig als de doelpoort onbereikbaar blijkt. Zonder
-// vergelijking weten we namelijk niet of dit bord uberhaupt naar buiten mag of
-// dat alleen deze ene poort dichtzit -- en dat is precies het verschil tussen
-// "vraag de netwerkbeheerder om de poort open te zetten" en "dit bord komt er
-// hoe dan ook niet uit".
-// Werkt TLS op poort 443 wel? Twee metingen naast elkaar, want alleen samen
-// zeggen ze iets:
-//   - zonder certificaatcontrole: lukt de TLS-handshake uberhaupt?
-//   - met onze root-certificaten:  is het certificaat ook van wie het hoort?
-// Verschil tussen die twee betekent dat er iets tussen zit dat het verkeer
-// openbreekt en met een eigen certificaat aan ons doorgeeft.
+// verbroken" en verzwijgt ze de oorzaak. Deze test meet de keten zelf door.
 //
-// ALLEEN op verzoek (TLS_TEST in config.h), en om een goede reden: blijft de
-// TLS-handshake halverwege steken, dan keert WiFiClientSecure niet terug -- de
-// timeout die we meegeven geldt voor het verbinden, niet voor het handshaken.
-// Op een netwerk dat TLS opvangt en laat doodbloeden zou de lamp dus blijven
-// hangen in zijn eigen zelftest en nooit meer aan zijn WebSocket toekomen.
-// Diagnose mag nooit in de weg lopen van de functie.
-#ifdef TLS_TEST
-static void tlsProefneming() {
-  // Certificaatcontrole vergelijkt geldigheidsdata, dus de klok moet kloppen --
-  // anders meten we onze eigen 1970 in plaats van het netwerk.
-  if (!tijdIsGeldig()) {
-    synchroniseerTijd();
-  }
+// Harde les uit het debuggen hiervan: een meting die twee dingen tegelijk
+// varieert bewijst niets, en een instrument met een verborgen timeout meet
+// zichzelf in plaats van het netwerk. Beide fouten hebben hier uren gekost,
+// dus elke meting hieronder varieert precies een ding en zet zijn eigen
+// timeout expliciet.
 
-  bool zonder = false;
-  {
-    WiFiClientSecure c;
-    c.setInsecure();
-    unsigned long t0 = millis();
-    zonder = c.connect(CONTROLE_HOST, 443, 8000);
-    c.stop();
-    Serial.printf("[test] tls  : zonder certificaatcontrole %s (%lu ms)\n",
-                  zonder ? "OK" : "MISLUKT", millis() - t0);
-  }
+// --- losse metingen, elk met precies EEN uitkomst -------------------------
+//
+// De vorige versie van deze zelftest vergeleek in een keer een andere host EN
+// een andere poort, en trok daar een conclusie uit over poorten. Dat kan niet.
+// Elke meting hieronder varieert daarom precies een ding.
 
-  bool met = false;
-  {
-    WiFiClientSecure c;
+// Naam opzoeken, apart getimed -- anders telt de DNS-tijd stilzwijgend mee in
+// de verbindingstijd en lijkt een snelle server traag.
+static bool meetDns(const char * host, IPAddress & uit) {
+  unsigned long t0 = millis();
+  bool ok = WiFi.hostByName(host, uit);
+  if (ok) {
+    Serial.printf("[test] dns  %-38s -> %-15s %4lu ms\n",
+                  host, uit.toString().c_str(), millis() - t0);
+  } else {
+    Serial.printf("[test] dns  %-38s -> MISLUKT       %4lu ms\n",
+                  host, millis() - t0);
+  }
+  return ok;
+}
+
+// Kale TCP-verbinding naar een IP-adres. Altijd per IP, nooit per naam, zodat
+// DNS hier geen rol meer speelt.
+static bool meetTcp(const char * wat, IPAddress ip, uint16_t poort) {
+  WiFiClient c;
+  unsigned long t0 = millis();
+  bool ok = c.connect(ip, poort, 6000);
+  unsigned long duur = millis() - t0;
+  c.stop();
+  Serial.printf("[test] tcp  %-22s %-15s :%-5u %-12s %4lu ms\n",
+                wat, ip.toString().c_str(), poort,
+                ok ? "open" : "GEEN ANTWOORD", duur);
+  return ok;
+}
+
+// TLS-handshake, met een EIGEN handshake-timeout. Zonder setHandshakeTimeout()
+// staat die in deze core hard op 120 seconden; de timeout die je aan connect()
+// meegeeft dekt alleen de TCP-verbinding. Daar zijn we twee avonden in gelopen.
+static bool meetTls(const char * host, uint16_t poort, bool metControle) {
+  WiFiClientSecure c;
+  c.setHandshakeTimeout(10);
+  if (metControle) {
     c.setCACert(ONAIR_ROOT_CAS);
-    unsigned long t0 = millis();
-    met = c.connect(CONTROLE_HOST, 443, 8000);
-    c.stop();
-    Serial.printf("[test] tls  : met certificaatcontrole    %s (%lu ms)\n",
-                  met ? "OK" : "MISLUKT", millis() - t0);
-  }
-
-  if (met) {
-    Serial.println("[test] -> TLS werkt volledig. Zet USE_TLS op true, SERVER_HOST op");
-    Serial.printf ("[test]    %s en SERVER_PORT op 443.\n", CONTROLE_HOST);
-  } else if (zonder) {
-    Serial.println("[test] -> versleutelen lukt, maar het certificaat is niet van ons:");
-    Serial.println("[test]    er zit een apparaat tussen dat het verkeer openbreekt");
   } else {
-    Serial.println("[test] -> TLS komt helemaal niet tot stand op dit netwerk");
+    c.setInsecure();
   }
-}
-#endif  // TLS_TEST
-
-static void controleMeting() {
-  WiFiClient ref;
   unsigned long t0 = millis();
-  bool ok = ref.connect(CONTROLE_HOST, CONTROLE_PORT, 8000);
-  ref.stop();
-  Serial.printf("[test] ref  : %s:%d %s (%lu ms)\n",
-                CONTROLE_HOST, CONTROLE_PORT,
-                ok ? "open" : "ONBEREIKBAAR", millis() - t0);
-  if (!ok) {
-    Serial.println("[test] -> ook een gewone poort lukt niet; dit bord komt het");
-    Serial.println("[test]    netwerk niet uit (verkeerd VLAN, of alles geblokkeerd)");
-    return;
-  }
-
-  Serial.println("[test] -> naar buiten mag wel, maar deze poort niet:");
-  Serial.println("[test]    een firewall blokkeert uitgaand verkeer op hoge poorten");
-#ifdef TLS_TEST
-  Serial.println("[test]    poort 443 staat wel open -- die route meten we nu:");
-  tlsProefneming();
-#else
-  Serial.println("[test]    poort 443 staat wel open; zet TLS_TEST in config.h om");
-  Serial.println("[test]    te meten of die route bruikbaar is");
-#endif
+  bool ok = c.connect(host, poort, 6000);
+  unsigned long duur = millis() - t0;
+  char fout[128] = { 0 };
+  if (!ok) c.lastError(fout, sizeof(fout));
+  c.stop();
+  Serial.printf("[test] tls  %-22s %-38s %-12s %5lu ms %s\n",
+                metControle ? "met certificaat" : "zonder certificaat",
+                host, ok ? "OK" : "MISLUKT", duur, fout);
+  return ok;
 }
 
+// --- de zelftest ----------------------------------------------------------
+//
+// Doel: in een oogopslag zien welke van de drie lagen faalt (naam, poort,
+// versleuteling) en of dat aan de bestemming of aan het netwerk ligt. Daarom
+// altijd meerdere bestemmingen naast elkaar: een meting zonder vergelijking
+// zegt niets.
 static void netwerkZelftest() {
-  Serial.println("[test] ---- netwerk-zelftest ----");
+  Serial.println("[test] ================ netwerk-zelftest ================");
 
-  // 1) Lost de naam op?
-  IPAddress ip;
-  unsigned long t0 = millis();
-  if (!WiFi.hostByName(SERVER_HOST, ip)) {
-    Serial.printf("[test] DNS  : MISLUKT voor %s\n", SERVER_HOST);
-    Serial.println("[test] -> zet DNS_FALLBACK in config.h op 1.1.1.1 of 8.8.8.8");
-    Serial.println("[test] ---- einde zelftest ----");
-    return;
-  }
-  Serial.printf("[test] DNS  : %s -> %s  (%lu ms)\n",
-                SERVER_HOST, ip.toString().c_str(), millis() - t0);
+  IPAddress doel, ctrl, dns1;
+  bool heeftDoel = meetDns(SERVER_HOST, doel);
+  bool heeftCtrl = meetDns(CONTROLE_HOST, ctrl);
+  dns1.fromString("1.1.1.1");
 
-  // 2) Komen we op de doelpoort binnen?
-  WiFiClient client;
-  t0 = millis();
-  if (!client.connect(ip, SERVER_PORT, 8000)) {
-    Serial.printf("[test] TCP  : poort %d ONBEREIKBAAR (%lu ms)\n",
-                  SERVER_PORT, millis() - t0);
-    controleMeting();
-    Serial.println("[test] ---- einde zelftest ----");
-    return;
+  Serial.println("[test] --- kale TCP-verbindingen ---");
+  if (heeftDoel) {
+    meetTcp("doel", doel, SERVER_PORT);
+    // Zelfde IP, andere poort: onderscheidt "deze poort dicht" van
+    // "deze bestemming onbereikbaar".
+    if (SERVER_PORT != 443) meetTcp("doel, poort 443", doel, 443);
+    if (SERVER_PORT != 80)  meetTcp("doel, poort 80", doel, 80);
   }
-  Serial.printf("[test] TCP  : poort %d open (%lu ms)\n", SERVER_PORT, millis() - t0);
+  if (heeftCtrl) {
+    // Andere bestemming, poort 443: onderscheidt "deze bestemming" van
+    // "alle bestemmingen".
+    meetTcp("controlehost", ctrl, 443);
+  }
+  // Een derde partij die niets met ons te maken heeft, op een standaardpoort.
+  meetTcp("1.1.1.1", dns1, 443);
+  // En een hoge poort naar diezelfde derde partij: als hoge poorten echt
+  // geblokkeerd zijn, faalt deze terwijl 443 hierboven lukte.
+  meetTcp("1.1.1.1, hoge poort", dns1, 8443);
 
-  // 3) Antwoordt daar ook echt onze app? Via de kale TCP-proxy komen we
-  //    rechtstreeks bij uvicorn uit, dus er hoort een HTTP-statusregel te
-  //    komen. Blijft het stil, dan luistert er iets anders.
-  client.print(String("GET /login HTTP/1.1\r\nHost: ") + SERVER_HOST +
-               "\r\nConnection: close\r\n\r\n");
-  String regel;
-  unsigned long start = millis();
-  while (millis() - start < 8000) {
-    while (client.available()) {
-      char c = (char)client.read();
-      if (c == '\r') continue;
-      if (c == '\n') { start = 0; break; }        // statusregel compleet
-      if (regel.length() < 120) regel += c;
-    }
-    if (start == 0) break;
-    if (!client.connected() && !client.available()) break;
-    delay(10);
-  }
-  client.stop();
-  if (regel.length()) {
-    Serial.printf("[test] HTTP : %s\n", regel.c_str());
-  } else {
-    Serial.println("[test] HTTP : geen antwoord -- er luistert iets anders dan de app");
-  }
-  Serial.println("[test] ---- einde zelftest ----");
+  Serial.println("[test] --- TLS-handshakes (10 s per poging) ---");
+  // Zonder certificaatcontrole eerst: die meet puur of de handshake zelf
+  // doorkomt. Lukt dat wel en de variant met certificaat niet, dan is het een
+  // certificaatprobleem. Lukt geen van beide, dan komt de handshake niet door.
+  meetTls(SERVER_HOST, 443, false);
+  meetTls(SERVER_HOST, 443, true);
+  // Een bestemming buiten ons eigen domein, om te zien of het aan onze server
+  // ligt of aan alle TLS-verkeer op dit netwerk.
+  meetTls("one.one.one.one", 443, false);
+
+  Serial.println("[test] ================ einde zelftest =================");
+  Serial.println("[test] lees dit zo: faalt ALLES bij tls maar lukt tcp overal,");
+  Serial.println("[test] dan onderschept iets op dit netwerk versleuteld verkeer.");
 }
 
 // ===========================================================================
@@ -725,13 +697,20 @@ void loop() {
 #endif
 
   // Start de WebSocket-client zodra het netwerk klaar is (eenmalig).
+  //
+  // De zelftest draait hierNA, niet ervoor. Diagnose mag de functie nooit
+  // ophouden: de metingen kosten bij elkaar tientallen seconden, en een lamp
+  // die daarop staat te wachten is een lamp die uit staat terwijl de studio
+  // denkt dat hij aan is.
   if (ethVerbonden && !wsGestart) {
     wsGestart = true;
 #if USE_TLS
     synchroniseerTijd();   // nodig om het servercertificaat te kunnen valideren
 #endif
-    netwerkZelftest();
     startWebSocket();
+#ifdef NET_TEST
+    netwerkZelftest();
+#endif
   }
 
   ws.loop();
