@@ -181,14 +181,24 @@ def _public(lamp: dict) -> dict:
 
 
 async def _apply_state(lamp_id: str, state: bool) -> dict | None:
-    """Zet de gewenste status op, stuur naar de ESP32 en broadcast naar de UI."""
+    """Zet de gewenste status op, stuur naar de ESP32 en broadcast naar de UI.
+
+    De gewenste stand wordt altijd bewaard, ook als de lamp offline is: zodra
+    hij terugkomt past hij hem alsnog toe. Maar of het commando dit moment
+    daadwerkelijk is afgeleverd, staat als "afgeleverd" in het antwoord.
+
+    Dat onderscheid is wezenlijk. Zonder die vlag antwoordt deze API 200 OK op
+    een commando dat nergens is aangekomen, en dat is voor een on-air lamp de
+    gevaarlijkste storing die er is: het bedieningspaneel meldt ON AIR terwijl
+    de lamp donker blijft.
+    """
     lamp = devices.set_state(lamp_id, state)
     if lamp is None:
         return None
-    await manager.send_command(lamp_id, state)
+    afgeleverd = await manager.send_command(lamp_id, state)
     payload = _public(lamp)
     await manager.broadcast({"type": "lamp", "lamp": payload})
-    return payload
+    return {**payload, "afgeleverd": afgeleverd}
 
 
 @app.get("/api/lamps")
