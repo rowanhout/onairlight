@@ -103,6 +103,11 @@
   #define OA_PHY_TYPE ETH_PHY_LAN8720
 #endif
 
+// Poort voor de lokale testmachine, zodat alleen LOKALE_TEST_HOST volstaat.
+#ifndef LOKALE_TEST_PORT
+  #define LOKALE_TEST_PORT 8000
+#endif
+
 // Standaard NTP-servers, zodat een oudere config.h zonder deze instellingen
 // gewoon blijft werken.
 #ifndef NTP_SERVER_1
@@ -634,6 +639,26 @@ static void netwerkZelftest() {
   // En een hoge poort naar diezelfde derde partij: als hoge poorten echt
   // geblokkeerd zijn, faalt deze terwijl 443 hierboven lukte.
   meetTcp("1.1.1.1, hoge poort", dns1, 8443);
+
+  Serial.println("[test] --- HTTP binnen het eigen netwerk ---");
+  // De beslissende meting. Verkeer naar een machine op hetzelfde subnet gaat
+  // rechtstreeks over de switch: geen router, geen gateway, geen firewall, geen
+  // NAT, geen MTU-versmalling. Lukt een HTTP-verzoek daar ook niet, dan kan het
+  // niet meer aan het netwerk liggen en zit de fout in dit bord.
+  //
+  // Zet LOKALE_TEST_HOST in config.h op het IP van een machine op je LAN en
+  // draai daar bijvoorbeeld:  python3 -m http.server 8000
+#ifdef LOKALE_TEST_HOST
+  meetHttpDownload(LOKALE_TEST_HOST, LOKALE_TEST_PORT, "/");
+#else
+  Serial.println("[test] overgeslagen -- zet LOKALE_TEST_HOST in config.h");
+#endif
+  // De gateway zelf, als die toevallig een webpagina serveert. Kost niets en
+  // is soms al genoeg: die zit per definitie op het eigen netwerk.
+  {
+    IPAddress gw = ETH.gatewayIP();
+    meetHttpDownload(gw.toString().c_str(), 80, "/");
+  }
 
   Serial.println("[test] --- grote HTTP-download (zonder TLS) ---");
   // De inlogpagina van onze eigen app, in platte tekst via de Railway

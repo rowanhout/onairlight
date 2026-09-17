@@ -221,6 +221,17 @@
 // De firmware doet bij elke start sowieso al een korte netwerk-zelftest
 // ([test] DNS / TCP / HTTP) die laat zien of de server bereikbaar is.
 //
+// BESLISSENDE METING bij verbindingsproblemen: laat het bord praten met een
+// machine op HETZELFDE subnet. Dat verkeer gaat rechtstreeks over de switch --
+// geen router, geen firewall, geen NAT, geen MTU-versmalling -- dus als dat
+// ook niet lukt, ligt het aan het bord en niet aan het netwerk.
+//
+// Draai op die machine bijvoorbeeld:  python3 -m http.server 8000
+// en zet hier zijn IP-adres:
+//
+// #define LOKALE_TEST_HOST "192.168.1.20"
+// #define LOKALE_TEST_PORT 8000
+//
 // Blijkt daaruit dat de doelpoort dicht zit, dan kun je laten meten of TLS op
 // poort 443 wel bruikbaar is. Zet daarvoor:
 //
