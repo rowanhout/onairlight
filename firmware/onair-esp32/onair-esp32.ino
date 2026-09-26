@@ -760,6 +760,15 @@ void startWebSocket() {
   pad += "&naam=" + urlEncode(LAMP_NAAM);
   pad += "&ruimte=" + urlEncode(LAMP_RUIMTE);
 
+  // Device-token als header (niet in de URL, die belandt in serverlogs).
+#ifdef DEVICE_TOKEN
+  if (strlen(DEVICE_TOKEN) > 0) {
+    static String tokenHeader;
+    tokenHeader = String("X-Device-Token: ") + DEVICE_TOKEN;
+    ws.setExtraHeaders(tokenHeader.c_str());
+  }
+#endif
+
   Serial.printf("[ws] verbinden met %s://%s:%u%s\n",
                 b.tls ? "wss" : "ws", b.host, b.poort, pad.c_str());
 
