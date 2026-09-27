@@ -61,12 +61,27 @@ class ConnectionManager:
     async def register_device(self, lamp_id: str, ws: WebSocket) -> None:
         await ws.accept()
         async with self._lock:
+            oud = self._devices.get(lamp_id)
             self._devices[lamp_id] = ws
+        # Een lamp die opnieuw verbindt (bijv. na een netwerkhik) vervangt zijn
+        # oude, meestal al dode socket; die sluiten we netjes af.
+        if oud is not None and oud is not ws:
+            try:
+                await oud.close(code=1000)
+            except Exception:
+                pass
 
-    async def unregister_device(self, lamp_id: str) -> None:
+    async def unregister_device(self, lamp_id: str, ws: Optional[WebSocket] = None) -> bool:
+        """Haal de device-socket van ``lamp_id`` weg. Met ``ws`` alleen als dat
+        ook echt de geregistreerde socket is, zodat een verouderde verbinding
+        een nieuwe registratie niet kan wissen. Geeft True als er iets is
+        verwijderd."""
         async with self._lock:
-            if self._devices.get(lamp_id) is not None:
-                del self._devices[lamp_id]
+            huidig = self._devices.get(lamp_id)
+            if huidig is None or (ws is not None and huidig is not ws):
+                return False
+            del self._devices[lamp_id]
+            return True
 
     def is_online(self, lamp_id: str) -> bool:
         return lamp_id in self._devices

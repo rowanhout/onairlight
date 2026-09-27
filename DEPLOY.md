@@ -31,10 +31,21 @@ Service → **Variables → New Variable**, voeg toe:
 |-----------|--------|-------------|
 | `SECRET_KEY` | lange random string | `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `ONAIR_API_KEY` | je eigen sleutel | voor Companion / REST-API (`X-API-Key`) |
+| `ONAIR_DEVICE_TOKEN` | lange random string | geheim dat de lampen meesturen op `/ws/device`; zie hieronder |
 | `ONAIR_DATA_DIR` | `/data` | wijst opslag naar het volume uit stap 2 |
 | `ONAIR_ADMIN_USER` | bv. `rowan` | eenmalige admin (zie stap 4) |
 | `ONAIR_ADMIN_PASSWORD` | sterk wachtwoord | "" |
 | `ONAIR_ADMIN_NAAM` | bv. `Rowan` | optioneel, weergavenaam |
+
+#### Device-token uitrollen
+Zonder `ONAIR_DEVICE_TOKEN` accepteert de server elke lamp-id zonder
+authenticatie (de server logt daar een waarschuwing over). Omdat de lampen geen
+OTA-update hebben, gaat de token in twee stappen:
+
+1. Zet `#define DEVICE_TOKEN "<zelfde waarde>"` in `firmware/config.h` en flash
+   alle lampen. Zolang de servervariabele leeg is, doet de token nog niets.
+2. Zet daarna `ONAIR_DEVICE_TOKEN` op Railway. Vanaf dat moment weigert de
+   server elke lamp zonder (juiste) token.
 
 ### 4. Eerste admin aanmaken
 Je hebt op Railway geen handige interactieve shell, dus `create_user.py` is

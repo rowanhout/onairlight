@@ -124,6 +124,8 @@ Stel in `config.h` minimaal in:
 - `SERVER_HOST`, `SERVER_PORT`, `USE_TLS` (zie "Hoe de lamp met de server
   verbindt" hieronder).
 - `LAMP_ID` (uniek!), `LAMP_NAAM`, `LAMP_RUIMTE`.
+- `DEVICE_TOKEN`: gelijk aan `ONAIR_DEVICE_TOKEN` op de server (zie
+  `DEPLOY.md`); zonder token weigert een server die hem afdwingt de lamp.
 - Eventueel `LAMP_PIN` (`-1` = board-default) en `HEARTBEAT_MS` (15000).
 - Optioneel `LAMP_HOSTNAME` (uitgecommentarieerd) voor een vaste netwerknaam.
 

@@ -90,6 +90,17 @@
 #define LAMP_RUIMTE "Studio 1"
 
 // ---------------------------------------------------------------------------
+// 3b) DEVICE-TOKEN
+// ---------------------------------------------------------------------------
+// Gedeeld geheim waarmee de server controleert dat dit echt een lamp van ons
+// is; zonder token kon iedereen die de URL kent zich als lamp aanmelden. Moet
+// gelijk zijn aan ONAIR_DEVICE_TOKEN op de server (zie DEPLOY.md). De lamp
+// stuurt hem als header "X-Device-Token" mee bij het verbinden. Leeg laten =
+// niets meesturen (werkt alleen zolang de server de token niet afdwingt).
+//
+#define DEVICE_TOKEN ""
+
+// ---------------------------------------------------------------------------
 // 4) LAMP-GPIO
 // ---------------------------------------------------------------------------
 // GPIO die via een 220R gate-weerstand de MOSFET (IRLZ44N) aanstuurt.

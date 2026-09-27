@@ -8,7 +8,9 @@ Opzet (SessionMiddleware/StaticFiles/Jinja2) en de auth-redirect-helpers zijn
 gemodelleerd op de bestaande houtprivate-app.
 """
 
+import logging
 import os
+import secrets
 from datetime import datetime, timezone
 
 import sentry_sdk
@@ -35,6 +37,15 @@ from hub import manager
 
 API_KEY = os.getenv("ONAIR_API_KEY", "")
 
+# Gedeeld geheim dat elke ESP32 meestuurt op /ws/device (header X-Device-Token
+# of ?token=…). Zonder deze controle kon iedereen die de URL kent zich als lamp
+# aanmelden, een echte lamp verdringen of een valse ON AIR-status sturen.
+# Leeg = niet afgedwongen (alleen bedoeld voor de overgang tot alle lampen een
+# firmware met token hebben); de server waarschuwt daar bij het opstarten over.
+DEVICE_TOKEN = os.getenv("ONAIR_DEVICE_TOKEN", "")
+
+log = logging.getLogger("uvicorn.error")
+
 app = FastAPI(title="On-Air Lamp")
 app.add_middleware(
     SessionMiddleware,
@@ -46,6 +57,16 @@ templates = Jinja2Templates(directory="templates")
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+@app.on_event("startup")
+async def _waarschuw_zonder_device_token() -> None:
+    if not DEVICE_TOKEN:
+        log.warning(
+            "ONAIR_DEVICE_TOKEN is niet gezet: /ws/device accepteert elke lamp-id "
+            "zonder authenticatie. Zet de variabele (en DEVICE_TOKEN in de "
+            "firmware) zodra alle lampen zijn bijgewerkt."
+        )
 
 
 @app.on_event("startup")
@@ -425,6 +446,12 @@ async def ws_device(ws: WebSocket):
     if not lamp_id:
         await ws.close(code=1008)  # policy violation: id verplicht
         return
+    if DEVICE_TOKEN:
+        token = ws.headers.get("x-device-token") or ws.query_params.get("token") or ""
+        if not secrets.compare_digest(token.encode(), DEVICE_TOKEN.encode()):
+            log.warning("device-websocket geweigerd voor id=%r: ongeldig of ontbrekend token", lamp_id)
+            await ws.close(code=1008)  # policy violation: token verplicht
+            return
 
     naam = ws.query_params.get("naam")
     ruimte = ws.query_params.get("ruimte")
@@ -457,10 +484,12 @@ async def ws_device(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        await manager.unregister_device(lamp_id)
-        lamp = devices.set_online(lamp_id, False, _now())
-        if lamp is not None:
-            await manager.broadcast({"type": "lamp", "lamp": _public(lamp)})
+        # Alleen "offline" melden als dít de geregistreerde socket was; is de
+        # lamp intussen opnieuw verbonden, dan blijft die registratie staan.
+        if await manager.unregister_device(lamp_id, ws):
+            lamp = devices.set_online(lamp_id, False, _now())
+            if lamp is not None:
+                await manager.broadcast({"type": "lamp", "lamp": _public(lamp)})
 
 
 @app.websocket("/rc/{slug}/ws")

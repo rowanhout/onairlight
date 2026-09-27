@@ -22,6 +22,8 @@ async def run(args) -> None:
         params["naam"] = args.naam
     if args.ruimte:
         params["ruimte"] = args.ruimte
+    if args.token:
+        params["token"] = args.token
     url = f"{args.server.rstrip('/')}/ws/device?{urlencode(params)}"
 
     state = False
@@ -55,6 +57,7 @@ def main() -> None:
     p.add_argument("--naam", default="Teststudio")
     p.add_argument("--ruimte", default="Studio 1")
     p.add_argument("--heartbeat", type=float, default=15.0)
+    p.add_argument("--token", default="", help="ONAIR_DEVICE_TOKEN van de server (als die is gezet)")
     asyncio.run(run(p.parse_args()))
 
 
